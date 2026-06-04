@@ -26,6 +26,7 @@ const upload = multer({
 /* ── POST /api/upload/image ─────────────────────────────────── */
 router.post("/image", auth, upload.single("image"), async (req, res) => {
   try {
+    if (!objectStorageClient) return res.status(503).json({ error: "Image storage not configured" });
     if (!req.file) return res.status(400).json({ error: "No image file provided" });
 
     const ext        = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
@@ -54,6 +55,7 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
 // No auth middleware — must be public so browsers/storefronts can load images
 router.get("/image-proxy", async (req, res) => {
   try {
+    if (!objectStorageClient) return res.status(503).send("Image storage not configured");
     const { key } = req.query;
     if (!key) return res.status(400).send("Missing key");
 

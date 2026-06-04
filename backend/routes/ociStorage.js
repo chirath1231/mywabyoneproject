@@ -13,18 +13,31 @@ const OCI_NAMESPACE = process.env.OCI_NAMESPACE;
 const OCI_BUCKET    = process.env.OCI_BUCKET_NAME;
 const OCI_REGION    = process.env.OCI_REGION;
 
-const ociProvider = new common.SimpleAuthenticationDetailsProvider(
-  process.env.OCI_TENANCY_ID,
-  process.env.OCI_USER_ID,
-  process.env.OCI_FINGERPRINT,
-  process.env.OCI_PRIVATE_KEY,
-  null,
-  common.Region.fromRegionId(OCI_REGION),
+const OCI_CONFIGURED = !!(
+  process.env.OCI_TENANCY_ID &&
+  process.env.OCI_USER_ID &&
+  process.env.OCI_FINGERPRINT &&
+  process.env.OCI_PRIVATE_KEY &&
+  OCI_REGION
 );
 
-const objectStorageClient = new os.ObjectStorageClient({
-  authenticationDetailsProvider: ociProvider,
-});
+let objectStorageClient = null;
+
+if (OCI_CONFIGURED) {
+  const ociProvider = new common.SimpleAuthenticationDetailsProvider(
+    process.env.OCI_TENANCY_ID,
+    process.env.OCI_USER_ID,
+    process.env.OCI_FINGERPRINT,
+    process.env.OCI_PRIVATE_KEY,
+    null,
+    common.Region.fromRegionId(OCI_REGION),
+  );
+  objectStorageClient = new os.ObjectStorageClient({
+    authenticationDetailsProvider: ociProvider,
+  });
+} else {
+  console.warn("[OCI] Storage not configured — image upload/delete features disabled.");
+}
 
 /**
  * Extract the OCI object key from a proxy URL.
@@ -53,8 +66,9 @@ function extractOciKey(imageUrl) {
  * Silently ignores errors (product deletion should succeed even if OCI cleanup fails).
  */
 async function deleteOciImage(imageUrl) {
+  if (!objectStorageClient) return;
   const key = extractOciKey(imageUrl) || imageUrl;
-  if (!key || !key.startsWith("products/")) return; // safety: only delete product images
+  if (!key || !key.startsWith("products/")) return;
 
   try {
     await objectStorageClient.deleteObject({
