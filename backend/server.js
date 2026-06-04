@@ -184,7 +184,11 @@ app.listen(PORT, '0.0.0.0', async () => {
     const fs   = require("fs");
     const path = require("path");
     const { pool } = require("./config/db");
-    const migrationsDir = path.join(__dirname, "db", "migrations");
+    // When bundled with esbuild, __dirname is backend/dist/ — go up one level
+    let migrationsDir = path.join(__dirname, "db", "migrations");
+    if (!fs.existsSync(migrationsDir)) {
+      migrationsDir = path.join(__dirname, "..", "db", "migrations");
+    }
 
     if (fs.existsSync(migrationsDir)) {
       const files = fs

@@ -19,17 +19,15 @@ function createMailTransporter() {
     throw new Error("SMTP_USER and SMTP_PASS must be set in backend/.env");
   }
 
-  // Nodemailer's Gmail preset handles STARTTLS correctly
-  if (host === "smtp.gmail.com" || process.env.SMTP_SERVICE === "gmail") {
-    return nodemailer.createTransport({ service: "gmail", auth });
-  }
-
+  // Force explicit host/port/IPv4 — Railway cannot reach Gmail over IPv6
+  // Using service:"gmail" preset picks IPv6 port 465 which is unreachable
   const port = Number(process.env.SMTP_PORT) || 587;
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
     port,
     secure: port === 465,
     auth,
+    family: 4, // force IPv4 — prevents ENETUNREACH on Railway
   });
 }
 
