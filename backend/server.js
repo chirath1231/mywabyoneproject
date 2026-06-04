@@ -176,9 +176,9 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅  WabyOne API running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
   console.log(`    Allowed origins: ${allowedOrigins.join(", ")}`);
 
-  // if (process.env.SMTP_LOG_OTP !== "true") {
-  //   await verifySmtp();
-  // }
+  if (process.env.SMTP_LOG_OTP !== "true") {
+    await verifySmtp();
+  }
 
   try {
     const fs   = require("fs");
