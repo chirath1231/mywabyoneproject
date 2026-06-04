@@ -41,10 +41,8 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
       contentType:   req.file.mimetype,
     });
 
-    // Use a full absolute path that matches however your backend is mounted
-    // Change the prefix below to match your app.use() mount path in server.js
-    const proxyUrl =
-  `${process.env.API_BASE_URL}/api/upload/image-proxy?key=${encodeURIComponent(objectName)}`;
+    const baseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const proxyUrl = `${baseUrl}/api/upload/image-proxy?key=${encodeURIComponent(objectName)}`;
     res.json({ url: proxyUrl });
   } catch (err) {
     console.error("OCI upload error:", err);
