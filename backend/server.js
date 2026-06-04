@@ -129,6 +129,13 @@ app.use("/api/store",         storeRoutes);
 app.use("/api/upload",        uploadRoutes);                   // ← NEW
 
 // ─────────────────────────────────────────────
+// API ROOT
+// ─────────────────────────────────────────────
+app.get("/api", (req, res) => {
+  res.json({ message: "WabyOne API is running!" });
+});
+
+// ─────────────────────────────────────────────
 // HEALTH CHECK
 // ─────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
