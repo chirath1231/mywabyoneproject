@@ -171,7 +171,7 @@ app.use((err, req, res, next) => {
 // ─────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅  WabyOne API running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
   console.log(`    Allowed origins: ${allowedOrigins.join(", ")}`);
 
