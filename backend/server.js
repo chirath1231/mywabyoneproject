@@ -46,6 +46,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5000",
   "https://waby-one.vercel.app",
+  "https://mywabyoneproject.vercel.app",
   process.env.FRONTEND_URL,
 ]
   .filter(Boolean)
