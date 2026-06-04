@@ -17,7 +17,7 @@ const onboardingRoutes   = require("./routes/onboarding");
 const workspaceRoutes    = require("./routes/workspaces");
 const storeRoutes        = require("./routes/store");
 const uploadRoutes       = require("./routes/uploadRoutes");   // ← NEW
-// const { verifySmtp }     = require("./config/mail");
+const { verifySmtp }     = require("./config/mail");
 
 const app = express();
 
@@ -79,8 +79,8 @@ const corsOptions = {
   ],
 };
 
-// app.use(cors(corsOptions));
-// app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ─────────────────────────────────────────────
 // RATE LIMITING
