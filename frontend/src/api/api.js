@@ -3,9 +3,7 @@ import axios from "axios";
 // ✅ Always use relative path in development — CRA proxy forwards to :5000
 // In production, REACT_APP_API_URL should be your deployed backend URL
 // e.g. https://your-api.railway.app/api
-const API_BASE = process.env.REACT_APP_API_URL
-  ? `${process.env.REACT_APP_API_URL}/api`
-  : "/api";
+const API_BASE = process.env.REACT_APP_API_URL || "/api";
 
 const api = axios.create({
   baseURL: API_BASE,

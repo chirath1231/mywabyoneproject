@@ -58,6 +58,8 @@ const corsOptions = {
     if (allowedOrigins.includes(normalized)) return callback(null, true);
     if (/^https:\/\/waby-one[\w-]*\.vercel\.app$/.test(normalized))
       return callback(null, true);
+    if (/^https:\/\/mywabyoneproject[\w-]*\.vercel\.app$/.test(normalized))
+      return callback(null, true);
     if (
       process.env.NODE_ENV !== "production" &&
       /^http:\/\/localhost:\d+$/.test(normalized)
