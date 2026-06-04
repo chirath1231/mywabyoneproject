@@ -632,11 +632,15 @@ router.post(
         await sendOtpEmail({ to: email, firstName: user.first_name, otp });
       } catch (mailErr) {
         console.error("Forgot password email error:", mailErr.message);
+        // In dev, log OTP to console so testing is possible without SMTP
         if (process.env.NODE_ENV !== "production") {
           console.info(`[dev] OTP for ${email}: ${otp}`);
           return res.json({ message: "If that email exists, an OTP has been sent." });
         }
-        throw mailErr;
+        // In production, return a clear error rather than a generic 500
+        return res.status(503).json({
+          error: "Email service is unavailable. Please contact support or try again later.",
+        });
       }
 
       res.json({ message: "If that email exists, an OTP has been sent." });
