@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Header from "../components/Layout/Header";
 import api from "../api/api";
 import { useAuth } from "../context/AuthContext";
@@ -86,14 +86,17 @@ export default function Settings() {
   const [selectedPreset, setSelectedPreset] = useState("");
   const [applyingPreset, setApplyingPreset] = useState(false);
 
-  // Populate the business form once AuthContext has finished loading.
-  // Then, fall back to /settings/organization to fill in any fields
-  // that /auth/me might not return (address, phone, website, tax_rate, etc).
+  const hasLoadedOrgRef = useRef(false);
+
+  // Populate the business form once, after AuthContext finishes loading.
   useEffect(() => {
     if (authLoading) {
       setOrgLoading(true);
       return;
     }
+
+    if (hasLoadedOrgRef.current) return;
+    hasLoadedOrgRef.current = true;
 
     let cancelled = false;
 
@@ -123,7 +126,7 @@ export default function Settings() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, organization]);
+  }, [authLoading]);
 
   useEffect(() => {
     api
