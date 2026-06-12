@@ -37,8 +37,30 @@ const WORKSPACE_EXAMPLES = {
   general: "e.g. My Business",
 };
 
+const EMPTY_ORG_FORM = {
+  name: "",
+  description: "",
+  address: "",
+  phone: "",
+  email: "",
+  website: "",
+  currency: "USD",
+  tax_rate: 0,
+};
+
+const mapOrgToForm = (org) => ({
+  name: org.name || "",
+  description: org.description || "",
+  address: org.address || "",
+  phone: org.phone || "",
+  email: org.email || "",
+  website: org.website || "",
+  currency: org.currency || "USD",
+  tax_rate: org.tax_rate ?? 0,
+});
+
 export default function Settings() {
-  const { organization, updateOrganization } = useAuth();
+  const { organization, updateOrganization, loading: authLoading } = useAuth();
   const { themes, currentTheme, setTheme, isDark, toggleDark } = useTheme();
   const ws = useWorkspace();
   const location = useLocation();
@@ -50,16 +72,9 @@ export default function Settings() {
   const [newWsPreset, setNewWsPreset] = useState("");
   const [creatingWs, setCreatingWs] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(params.get("upgrade") === "1");
-  const [orgForm, setOrgForm] = useState({
-    name: "",
-    description: "",
-    address: "",
-    phone: "",
-    email: "",
-    website: "",
-    currency: "USD",
-    tax_rate: 0,
-  });
+  const [orgForm, setOrgForm] = useState(EMPTY_ORG_FORM);
+  const [orgLoading, setOrgLoading] = useState(true);
+  const [savingOrg, setSavingOrg] = useState(false);
   const [customFields, setCustomFields] = useState([]);
   const [newField, setNewField] = useState({
     entity_type: "product",
@@ -71,21 +86,44 @@ export default function Settings() {
   const [selectedPreset, setSelectedPreset] = useState("");
   const [applyingPreset, setApplyingPreset] = useState(false);
 
+  // Populate the business form once AuthContext has finished loading.
+  // Then, fall back to /settings/organization to fill in any fields
+  // that /auth/me might not return (address, phone, website, tax_rate, etc).
   useEffect(() => {
-    if (organization) {
-      setOrgForm({
-        name: organization.name || "",
-        description: organization.description || "",
-        address: organization.address || "",
-        phone: organization.phone || "",
-        email: organization.email || "",
-        website: organization.website || "",
-        currency: organization.currency || "USD",
-        tax_rate: organization.tax_rate || 0,
-      });
+    if (authLoading) {
+      setOrgLoading(true);
+      return;
     }
+
+    let cancelled = false;
+
+    const hydrateForm = async () => {
+      if (organization) {
+        setOrgForm(mapOrgToForm(organization));
+      }
+
+      try {
+        const res = await api.get("/settings/organization");
+        if (cancelled) return;
+        if (res.data) {
+          updateOrganization(res.data);
+          setOrgForm(mapOrgToForm(res.data));
+        }
+      } catch (err) {
+        /* ignore - keep whatever we already have from AuthContext */
+      } finally {
+        if (!cancelled) setOrgLoading(false);
+      }
+    };
+
+    hydrateForm();
     loadCustomFields();
-  }, [organization]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, organization]);
 
   useEffect(() => {
     api
@@ -106,8 +144,9 @@ export default function Settings() {
       });
       toast.success(res.data.message || "Preset applied!");
       // Reload org info
-      const meRes = await api.get("/auth/me");
-      updateOrganization(meRes.data.organization);
+      const orgRes = await api.get("/settings/organization");
+      updateOrganization(orgRes.data);
+      setOrgForm(mapOrgToForm(orgRes.data));
       loadCustomFields();
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to apply preset");
@@ -132,12 +171,16 @@ export default function Settings() {
 
   const saveOrg = async (e) => {
     e.preventDefault();
+    setSavingOrg(true);
     try {
       const res = await api.put("/settings/organization", orgForm);
       updateOrganization(res.data);
+      setOrgForm(mapOrgToForm(res.data));
       toast.success("Business settings saved");
     } catch (err) {
-      toast.error("Failed to save settings");
+      toast.error(err.response?.data?.error || "Failed to save settings");
+    } finally {
+      setSavingOrg(false);
     }
   };
 
@@ -507,119 +550,152 @@ export default function Settings() {
           <div className="card">
             <div className="card-header">
               <h3 className="card-title">Business Information</h3>
-            </div>
-            <form onSubmit={saveOrg}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Business Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={orgForm.name}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    value={orgForm.email}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, email: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Phone</label>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    value={orgForm.phone}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, phone: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Website</label>
-                  <input
-                    type="url"
-                    className="form-control"
-                    value={orgForm.website}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, website: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Address</label>
-                <textarea
-                  className="form-control"
-                  value={orgForm.address}
-                  onChange={(e) =>
-                    setOrgForm({ ...orgForm, address: e.target.value })
-                  }
-                />
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  className="form-control"
-                  value={orgForm.description}
-                  onChange={(e) =>
-                    setOrgForm({ ...orgForm, description: e.target.value })
-                  }
-                />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Currency</label>
-                  <select
-                    className="form-control"
-                    value={orgForm.currency}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, currency: e.target.value })
-                    }
-                  >
-                    <option value="USD">USD - US Dollar</option>
-                    <option value="EUR">EUR - Euro</option>
-                    <option value="GBP">GBP - British Pound</option>
-                    <option value="LKR">LKR - Sri Lankan Rupee</option>
-                    <option value="INR">INR - Indian Rupee</option>
-                    <option value="AUD">AUD - Australian Dollar</option>
-                    <option value="CAD">CAD - Canadian Dollar</option>
-                    <option value="JPY">JPY - Japanese Yen</option>
-                    <option value="AED">AED - UAE Dirham</option>
-                    <option value="SGD">SGD - Singapore Dollar</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Default Tax Rate (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={orgForm.tax_rate}
-                    onChange={(e) =>
-                      setOrgForm({ ...orgForm, tax_rate: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ marginTop: 8 }}
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  margin: "4px 0 0",
+                }}
               >
-                <Save size={16} /> Save Settings
-              </button>
-            </form>
+                This is the information you provided when you registered.
+                You can update it at any time.
+              </p>
+            </div>
+
+            {orgLoading ? (
+              <div style={{ padding: 24, textAlign: "center" }}>
+                <RefreshCw
+                  size={20}
+                  className="spin"
+                  style={{ marginBottom: 8 }}
+                />
+                <div style={{ color: "var(--text-secondary)" }}>
+                  Loading business information...
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={saveOrg} style={{ padding: 16 }}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Business Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={orgForm.name}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, name: e.target.value })
+                      }
+                      placeholder="e.g. My Business"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={orgForm.email}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, email: e.target.value })
+                      }
+                      placeholder="business@example.com"
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      value={orgForm.phone}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, phone: e.target.value })
+                      }
+                      placeholder="e.g. +94 71 234 5678"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Website</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      value={orgForm.website}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, website: e.target.value })
+                      }
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Address</label>
+                  <textarea
+                    className="form-control"
+                    value={orgForm.address}
+                    onChange={(e) =>
+                      setOrgForm({ ...orgForm, address: e.target.value })
+                    }
+                    placeholder="Business address"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    className="form-control"
+                    value={orgForm.description}
+                    onChange={(e) =>
+                      setOrgForm({ ...orgForm, description: e.target.value })
+                    }
+                    placeholder="A short description of your business"
+                  />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Currency</label>
+                    <select
+                      className="form-control"
+                      value={orgForm.currency}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, currency: e.target.value })
+                      }
+                    >
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="GBP">GBP - British Pound</option>
+                      <option value="LKR">LKR - Sri Lankan Rupee</option>
+                      <option value="INR">INR - Indian Rupee</option>
+                      <option value="AUD">AUD - Australian Dollar</option>
+                      <option value="CAD">CAD - Canadian Dollar</option>
+                      <option value="JPY">JPY - Japanese Yen</option>
+                      <option value="AED">AED - UAE Dirham</option>
+                      <option value="SGD">SGD - Singapore Dollar</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Default Tax Rate (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-control"
+                      value={orgForm.tax_rate}
+                      onChange={(e) =>
+                        setOrgForm({ ...orgForm, tax_rate: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ marginTop: 8 }}
+                  disabled={savingOrg}
+                >
+                  <Save size={16} />
+                  {savingOrg ? "Saving..." : "Save Settings"}
+                </button>
+              </form>
+            )}
           </div>
         )}
 
