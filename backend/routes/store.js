@@ -27,7 +27,7 @@ router.get("/:slug", async (req, res) => {
               c.name AS category_name
        FROM wabyone_products p
        LEFT JOIN wabyone_categories c ON p.category_id = c.id
-       WHERE p.org_id = $1 AND p.is_active = true
+       WHERE p.org_id = $1 AND p.is_active = true AND p.status = 'active'
        ORDER BY p.created_at DESC`,
       [org.id]
     );
@@ -89,7 +89,7 @@ router.get("/:slug/:type/:id", async (req, res) => {
         `SELECT p.*, c.name AS category_name
          FROM wabyone_products p
          LEFT JOIN wabyone_categories c ON p.category_id = c.id
-         WHERE p.id = $1 AND p.org_id = $2 AND p.is_active = true`,
+         WHERE p.id = $1 AND p.org_id = $2 AND p.is_active = true AND p.status = 'active'`,
         [id, org.id]
       );
     } else {
@@ -160,7 +160,7 @@ router.post("/:slug/order", async (req, res) => {
       let itemResult;
       if (it.type === "product") {
         itemResult = await db(
-          `SELECT id, name, price, quantity FROM wabyone_products WHERE id = $1 AND org_id = $2 AND is_active = true`,
+          `SELECT id, name, price, quantity FROM wabyone_products WHERE id = $1 AND org_id = $2 AND is_active = true AND status = 'active'`,
           [it.item_id, org.id]
         );
       } else {

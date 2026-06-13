@@ -397,10 +397,17 @@ select {
   color: var(--accent);
 }
 
+.stat-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .stat-info h3 {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .stat-info p {
