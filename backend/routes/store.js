@@ -23,7 +23,7 @@ router.get("/:slug", async (req, res) => {
     const org = orgResult.rows[0];
 
     const productsResult = await db(
-      `SELECT p.id, p.name, p.description, p.price, p.unit, p.image_url,
+      `SELECT p.id, p.name, p.description, p.price, p.unit, p.image_url, p.quantity,
               c.name AS category_name
        FROM wabyone_products p
        LEFT JOIN wabyone_categories c ON p.category_id = c.id
@@ -127,13 +127,21 @@ router.get("/:slug/:type/:id", async (req, res) => {
 // POST /api/store/:slug/order — public storefront order (creates draft invoice)
 router.post("/:slug/order", async (req, res) => {
   const { slug } = req.params;
-  const { type, item_id, customer_name, customer_email, customer_phone } = req.body;
+  const { items, customer_name, customer_email, customer_phone } = req.body;
 
-  if (!["product", "service"].includes(type)) {
-    return res.status(400).json({ error: "Invalid item type" });
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Your cart is empty" });
   }
-  if (!item_id) {
-    return res.status(400).json({ error: "item_id is required" });
+  for (const it of items) {
+    if (!it || !["product", "service"].includes(it.type)) {
+      return res.status(400).json({ error: "Invalid item type" });
+    }
+    if (!it.item_id) {
+      return res.status(400).json({ error: "item_id is required" });
+    }
+    if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
+      return res.status(400).json({ error: "quantity must be a positive whole number" });
+    }
   }
 
   try {
@@ -146,23 +154,39 @@ router.post("/:slug/order", async (req, res) => {
     }
     const org = orgResult.rows[0];
 
-    let itemResult;
-    if (type === "product") {
-      itemResult = await db(
-        `SELECT id, name, price FROM wabyone_products WHERE id = $1 AND org_id = $2 AND is_active = true`,
-        [item_id, org.id]
-      );
-    } else {
-      itemResult = await db(
-        `SELECT id, name, price FROM wabyone_services WHERE id = $1 AND org_id = $2 AND is_active = true`,
-        [item_id, org.id]
-      );
-    }
+    // Load + validate every line item in the cart
+    const lines = [];
+    for (const it of items) {
+      let itemResult;
+      if (it.type === "product") {
+        itemResult = await db(
+          `SELECT id, name, price, quantity FROM wabyone_products WHERE id = $1 AND org_id = $2 AND is_active = true`,
+          [it.item_id, org.id]
+        );
+      } else {
+        itemResult = await db(
+          `SELECT id, name, price FROM wabyone_services WHERE id = $1 AND org_id = $2 AND is_active = true`,
+          [it.item_id, org.id]
+        );
+      }
 
-    if (itemResult.rows.length === 0) {
-      return res.status(404).json({ error: "Item not found" });
+      if (itemResult.rows.length === 0) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+      const row = itemResult.rows[0];
+
+      if (it.type === "product" && row.quantity != null && it.quantity > row.quantity) {
+        return res.status(400).json({ error: `Only ${row.quantity} of "${row.name}" left in stock` });
+      }
+
+      lines.push({
+        type:     it.type,
+        id:       row.id,
+        name:     row.name,
+        price:    parseFloat(row.price),
+        quantity: it.quantity,
+      });
     }
-    const item = itemResult.rows[0];
 
     // Find or create customer when info is provided
     let customer_id = null;
@@ -200,9 +224,8 @@ router.post("/:slug/order", async (req, res) => {
       invoice_number = `INV-${String(num).padStart(4, "0")}`;
     }
 
-    const price      = parseFloat(item.price);
     const taxRate    = parseFloat(org.tax_rate || 0);
-    const subtotal   = price;
+    const subtotal   = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
     const tax_amount = subtotal * (taxRate / 100);
     const total      = subtotal + tax_amount;
 
@@ -222,12 +245,14 @@ router.post("/:slug/order", async (req, res) => {
     );
     const invoice = invoiceResult.rows[0];
 
-    const col = type === "product" ? "product_id" : "service_id";
-    await db(
-      `INSERT INTO wabyone_invoice_items (invoice_id, ${col}, description, quantity, unit_price, discount, total)
-       VALUES ($1, $2, $3, 1, $4, 0, $5)`,
-      [invoice.id, item.id, item.name, price, price]
-    );
+    for (const l of lines) {
+      const col = l.type === "product" ? "product_id" : "service_id";
+      await db(
+        `INSERT INTO wabyone_invoice_items (invoice_id, ${col}, description, quantity, unit_price, discount, total)
+         VALUES ($1, $2, $3, $4, $5, 0, $6)`,
+        [invoice.id, l.id, l.name, l.quantity, l.price, l.price * l.quantity]
+      );
+    }
 
     res.json({ invoice_number: invoice.invoice_number });
   } catch (err) {
