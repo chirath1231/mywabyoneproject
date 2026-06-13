@@ -99,7 +99,7 @@ router.post(
         name, description, sku, barcode, serial_number,
         price, cost_price, quantity, min_stock, unit,
         image_url, category_id, custom_fields,
-        has_warranty, warranty_months,
+        has_warranty, warranty_months, status,
       } = req.body;
 
       if (has_warranty && (!warranty_months || parseInt(warranty_months) <= 0)) {
@@ -110,8 +110,8 @@ router.post(
         `INSERT INTO wabyone_products
            (org_id, workspace_id, name, description, sku, barcode, serial_number,
             price, cost_price, quantity, min_stock, unit,
-            image_url, category_id, custom_fields, has_warranty, warranty_months)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+            image_url, category_id, custom_fields, has_warranty, warranty_months, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING *`,
         [
           req.user.orgId,
@@ -131,6 +131,7 @@ router.post(
           JSON.stringify(custom_fields || {}),
           has_warranty   ? true : false,
           has_warranty && warranty_months ? parseInt(warranty_months) : null,
+          status === "inactive" ? "inactive" : "active",
         ],
       );
 
@@ -159,7 +160,7 @@ router.put("/:id", auth, async (req, res) => {
       name, description, sku, barcode, serial_number,
       price, cost_price, quantity, min_stock, unit,
       image_url, category_id, is_active, custom_fields,
-      has_warranty, warranty_months,
+      has_warranty, warranty_months, status,
     } = req.body;
 
     if (has_warranty && (!warranty_months || parseInt(warranty_months) <= 0)) {
@@ -192,8 +193,9 @@ router.put("/:id", auth, async (req, res) => {
          custom_fields   = COALESCE($14, custom_fields),
          has_warranty    = COALESCE($15, has_warranty),
          warranty_months = COALESCE($16, warranty_months),
+         status          = COALESCE($17, status),
          updated_at      = NOW()
-       WHERE id = $17 AND org_id = $18
+       WHERE id = $18 AND org_id = $19
        RETURNING *`,
       [
         name          || null,
@@ -218,6 +220,7 @@ router.put("/:id", auth, async (req, res) => {
             : warranty_months !== undefined
               ? parseInt(warranty_months)
               : null,
+        status === "active" || status === "inactive" ? status : null,
         req.params.id,
         req.user.orgId,
       ],

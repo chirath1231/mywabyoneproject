@@ -24,6 +24,7 @@ const EMPTY_FORM = {
   image_url:      "",
   has_warranty:   false,
   warranty_months: "",
+  status:         "active",
 };
 
 /* ── Image Upload Zone ─────────────────────────────────────── */
@@ -214,6 +215,7 @@ export default function Products() {
       image_url:       p.image_url       || "",
       has_warranty:    !!p.has_warranty,
       warranty_months: p.warranty_months != null ? String(p.warranty_months) : "",
+      status:          p.status || "active",
     });
     setShowModal(true);
   };
@@ -247,6 +249,7 @@ export default function Products() {
       warranty_months: form.has_warranty && form.warranty_months
         ? parseInt(form.warranty_months)
         : null,
+      status:          form.status,
     };
 
     try {
@@ -262,6 +265,18 @@ export default function Products() {
       loadProducts();
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to save product");
+    }
+  };
+
+  /* ── toggle active/inactive ── */
+  const handleToggleStatus = async (p) => {
+    const newStatus = p.status === "active" ? "inactive" : "active";
+    try {
+      await api.put(`/products/${p.id}`, { status: newStatus });
+      toast.success(`Product marked as ${newStatus === "active" ? "Active" : "Inactive"}`);
+      loadProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update status");
     }
   };
 
@@ -335,6 +350,8 @@ export default function Products() {
         .pr-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid transparent;}
         .pr-badge-active{color:#34d399;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25);}
         .pr-badge-inactive{color:var(--text-muted);background:var(--bg-primary);border-color:var(--border);}
+        .pr-badge-toggle{cursor:pointer;font:inherit;transition:.18s;}
+        .pr-badge-toggle:hover{opacity:.8;}
 
         .pr-warranty{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#818cf8;}
 
@@ -559,9 +576,14 @@ export default function Products() {
 
                         {/* Status */}
                         <td>
-                          <span className={`pr-badge ${p.is_active ? "pr-badge-active" : "pr-badge-inactive"}`}>
-                            {p.is_active ? "Active" : "Inactive"}
-                          </span>
+                          <button
+                            type="button"
+                            className={`pr-badge pr-badge-toggle ${p.status === "active" ? "pr-badge-active" : "pr-badge-inactive"}`}
+                            onClick={() => handleToggleStatus(p)}
+                            title="Click to toggle status"
+                          >
+                            {p.status === "active" ? "Active" : "Inactive"}
+                          </button>
                         </td>
 
                         {/* Actions */}
@@ -682,6 +704,21 @@ export default function Products() {
                       <option value="box">Box</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="pr-toggle-row">
+                  <div>
+                    <div className="pr-toggle-label">Active</div>
+                    <div className="pr-toggle-sub">Inactive products are hidden from the storefront</div>
+                  </div>
+                  <label className="pr-switch">
+                    <input
+                      type="checkbox"
+                      checked={form.status === "active"}
+                      onChange={(e) => set("status", e.target.checked ? "active" : "inactive")}
+                    />
+                    <span className="pr-slider" />
+                  </label>
                 </div>
 
                 {/* ── Product Image ── */}
