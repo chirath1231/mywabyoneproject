@@ -126,6 +126,26 @@ router.post(
       );
       const taxRate = parseFloat(orgResult.rows[0]?.tax_rate || 0);
 
+      // Validate stock availability for product line items
+      for (const item of items) {
+        if (item.product_id) {
+          const productResult = await db(
+            "SELECT name, quantity, reserved_quantity FROM wabyone_products WHERE id = $1 AND org_id = $2",
+            [item.product_id, req.user.orgId],
+          );
+          if (productResult.rows.length === 0) {
+            return res.status(404).json({ error: "Product not found" });
+          }
+          const product = productResult.rows[0];
+          const available = (product.quantity || 0) - (product.reserved_quantity || 0);
+          if (item.quantity > available) {
+            return res.status(400).json({
+              error: `Insufficient Stock for "${product.name}". Available: ${available}, requested: ${item.quantity}.`,
+            });
+          }
+        }
+      }
+
       const invoice_number = await getNextInvoiceNumber(req.user.orgId);
 
       // Calculate totals

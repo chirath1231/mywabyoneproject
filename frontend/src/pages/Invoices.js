@@ -10,6 +10,7 @@ import {
   X,
   Send,
   CheckCircle,
+  Ban,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
@@ -102,7 +103,24 @@ export default function Invoices() {
     setForm({ ...form, items: form.items.filter((_, i) => i !== idx) });
   };
 
+  const getAvailableStock = (productId) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return null;
+    return (product.quantity || 0) - (product.reserved_quantity || 0);
+  };
+
   const updateItem = (idx, field, value) => {
+    if (field === "quantity") {
+      const productId = form.items[idx].product_id;
+      if (productId) {
+        const available = getAvailableStock(productId);
+        if (available != null && parseFloat(value) > available) {
+          toast.error(`Insufficient Stock. Only ${available} available.`);
+          return;
+        }
+      }
+    }
+
     const items = [...form.items];
     items[idx] = { ...items[idx], [field]: value };
 
@@ -136,6 +154,17 @@ export default function Invoices() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    for (const item of form.items) {
+      if (item.product_id) {
+        const available = getAvailableStock(item.product_id);
+        if (available != null && parseFloat(item.quantity) > available) {
+          toast.error(`Insufficient Stock. Only ${available} available.`);
+          return;
+        }
+      }
+    }
+
     try {
       await api.post("/invoices", {
         ...form,
@@ -182,9 +211,17 @@ export default function Invoices() {
       if (!confirmed) return;
     }
 
+    // Confirm before cancelling — restores/releases any committed stock
+    if (status === "cancelled") {
+      const confirmed = window.confirm(
+        "Are you sure you want to cancel this order?"
+      );
+      if (!confirmed) return;
+    }
+
     try {
       await api.patch(`/invoices/${id}/status`, { status });
-      toast.success(`Invoice marked as ${status}`);
+      toast.success(status === "cancelled" ? "Invoice cancelled" : `Invoice marked as ${status}`);
       loadData();
       if (showDetail) {
         const res = await api.get(`/invoices/${id}`);
@@ -222,7 +259,7 @@ export default function Invoices() {
       sent: "info",
       draft: "secondary",
       overdue: "danger",
-      cancelled: "warning",
+      cancelled: "danger",
     };
     return (
       <span className={`badge badge-${map[status] || "secondary"}`}>
@@ -362,6 +399,17 @@ export default function Invoices() {
                             </button>
                           )}
 
+                          {inv.status !== "cancelled" && (
+                            <button
+                              className="btn-icon"
+                              onClick={() => updateStatus(inv.id, "cancelled")}
+                              style={{ color: "var(--danger)" }}
+                              title="Cancel Order"
+                            >
+                              <Ban size={16} />
+                            </button>
+                          )}
+
                           <button
                             className="btn-icon"
                             onClick={() => handleDelete(inv.id)}
@@ -479,7 +527,7 @@ export default function Invoices() {
                             <optgroup label="Products">
                               {products.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} - ${p.price}
+                                  {p.name} - ${p.price} (Stock: {(p.quantity || 0) - (p.reserved_quantity || 0)})
                                 </option>
                               ))}
                             </optgroup>
@@ -534,6 +582,11 @@ export default function Invoices() {
                               updateItem(idx, "quantity", e.target.value)
                             }
                             min="1"
+                            max={
+                              item.product_id
+                                ? getAvailableStock(item.product_id) ?? undefined
+                                : undefined
+                            }
                           />
                         </div>
                         <div>
@@ -861,6 +914,15 @@ export default function Invoices() {
                     onClick={() => updateStatus(showDetail.id, "paid")}
                   >
                     <CheckCircle size={16} /> Mark as Paid
+                  </button>
+                )}
+                {showDetail.status !== "cancelled" && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => updateStatus(showDetail.id, "cancelled")}
+                    style={{ color: "var(--danger)" }}
+                  >
+                    <Ban size={16} /> Cancel Order
                   </button>
                 )}
               </div>
