@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
-import { Globe, Mail, Phone, Search, ShoppingBag, Sparkles, Wrench, Zap } from "lucide-react";
+import { Globe, Mail, Phone, Search, ShoppingBag, ShoppingCart, Sparkles, Wrench, Zap } from "lucide-react";
+import toast from "react-hot-toast";
+import useCart from "../hooks/useCart";
+import CartDrawer from "../components/Storefront/CartDrawer";
 
 /* ─── Animated shopkeeper mascot ─────────────────────────────────────── */
 function StoreMascot({ primary, accent, second }) {
@@ -204,6 +207,9 @@ export default function Storefront() {
   const [error,   setError]   = useState(null);
   const [filter,  setFilter]  = useState("all");
   const [search,  setSearch]  = useState("");
+  const [showCart, setShowCart] = useState(false);
+
+  const cart = useCart(slug);
 
   useEffect(() => {
     api.get(`/store/${slug}`)
@@ -257,6 +263,25 @@ export default function Storefront() {
   const org      = data.organization;
   const currency = org.currency || "USD";
   const fmt      = p => new Intl.NumberFormat("en-US",{style:"currency",currency}).format(p);
+
+  const handleAddToCart = (item) => {
+    const maxQty = item.itemType==="product" && item.quantity!=null ? Number(item.quantity) : undefined;
+    if (maxQty !== undefined && maxQty <= 0) {
+      toast.error("This item is out of stock");
+      return;
+    }
+    cart.add({
+      key: `${item.itemType}-${item.id}`,
+      type: item.itemType,
+      id:   item.id,
+      name: item.name,
+      price: Number(item.price)||0,
+      image_url: item.image_url,
+      unit: item.unit,
+      maxQty,
+    });
+    toast.success(`${item.name} added to cart`);
+  };
 
   const FILTERS = [
     { val:"all",     label:"✨ All",       count:(data.products?.length||0)+(data.services?.length||0) },
@@ -432,6 +457,22 @@ export default function Storefront() {
             <Zap size={13} style={{ color:primary }}/>
             <span style={{ fontSize:13,fontWeight:700,color:primary }}>{items.length} items</span>
           </div>
+
+          <button onClick={()=>setShowCart(true)}
+            style={{ position:"relative",display:"flex",alignItems:"center",gap:8,padding:"9px 16px",
+              borderRadius:999,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:font,
+              background:`linear-gradient(135deg,${primary},${second})`,color:"white",
+              boxShadow:`0 4px 16px ${primary}44` }}>
+            <ShoppingCart size={14}/> Cart
+            {cart.totalCount>0 && (
+              <span style={{ position:"absolute",top:-6,right:-6,minWidth:20,height:20,borderRadius:999,
+                background:accent,color:"white",fontSize:11,fontWeight:800,
+                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px",
+                border:"2px solid #f0f2ff",animation:"bounceIn 0.4s both" }}>
+                {cart.totalCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -459,6 +500,7 @@ export default function Storefront() {
               const chipCol   = isProduct ? primary : second;
               const gradStart = isProduct ? primary : second;
               const gradEnd   = isProduct ? accent  : primary;
+              const outOfStock = isProduct && item.quantity===0;
 
               return (
                 <div key={`${item.itemType}-${item.id}`}
@@ -500,6 +542,17 @@ export default function Storefront() {
                       {isProduct?<ShoppingBag size={10}/>:<Wrench size={10}/>}
                       {item.itemType}
                     </span>
+                    {/* Out of stock badge */}
+                    {outOfStock && (
+                      <span style={{ position:"absolute",top:12,left:12,
+                        display:"inline-flex",alignItems:"center",gap:5,
+                        padding:"5px 12px",borderRadius:999,fontSize:11,fontWeight:800,
+                        textTransform:"uppercase",letterSpacing:"0.05em",
+                        background:"#ef4444",color:"white",boxShadow:"0 4px 12px rgba(239,68,68,0.5)",
+                        animation:"bounceIn 0.4s both" }}>
+                        Out of Stock
+                      </span>
+                    )}
                   </div>
 
                   {/* Body */}
@@ -530,10 +583,24 @@ export default function Storefront() {
                         {item.unit&&`/ ${item.unit}`}{item.duration_minutes&&`${item.duration_minutes} min`}
                       </span>
                     </div>
-                    <div style={{ marginTop:12,padding:"9px 0",borderRadius:12,textAlign:"center",
-                      background:`linear-gradient(135deg,${gradStart}18,${gradEnd}18)`,
-                      border:`1px solid ${chipCol}33`,fontSize:13,fontWeight:700,color:chipCol }}>
-                      View Details →
+                    <div style={{ marginTop:12,display:"flex",gap:8 }}>
+                      <button onClick={e=>{e.stopPropagation();handleAddToCart(item);}}
+                        disabled={outOfStock}
+                        style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                          padding:"9px 0",borderRadius:12,border:"none",fontFamily:"inherit",
+                          fontSize:13,fontWeight:700,
+                          cursor:outOfStock?"not-allowed":"pointer",
+                          background:outOfStock?"#e2e8f0":`linear-gradient(135deg,${gradStart},${gradEnd})`,
+                          color:outOfStock?"#94a3b8":"white",
+                          boxShadow:outOfStock?"none":`0 4px 12px ${chipCol}44` }}>
+                        <ShoppingCart size={13}/>
+                        {outOfStock?"Out of Stock":"Add to Cart"}
+                      </button>
+                      <div style={{ flex:1,padding:"9px 0",borderRadius:12,textAlign:"center",
+                        background:`linear-gradient(135deg,${gradStart}18,${gradEnd}18)`,
+                        border:`1px solid ${chipCol}33`,fontSize:13,fontWeight:700,color:chipCol }}>
+                        Details →
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -552,6 +619,22 @@ export default function Storefront() {
           {" "}· Powered by <span style={{ fontWeight:900,color:accent }}>WabyOne</span>
         </p>
       </footer>
+
+      {showCart && (
+        <CartDrawer
+          slug={slug}
+          cart={cart.cart}
+          updateQty={cart.updateQty}
+          remove={cart.remove}
+          clear={cart.clear}
+          onClose={()=>setShowCart(false)}
+          currency={currency}
+          primary={primary}
+          accent={accent}
+          second={second}
+          font={font}
+        />
+      )}
     </div>
   );
 }

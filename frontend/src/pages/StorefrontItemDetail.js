@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
-import { ArrowLeft, Clock, CreditCard, Package, ShoppingBag, Star, Tag, Wrench } from "lucide-react";
+import { ArrowLeft, Clock, CreditCard, Minus, Package, Plus, ShoppingBag, ShoppingCart, Star, Tag, Wrench } from "lucide-react";
 import toast from "react-hot-toast";
+import useCart from "../hooks/useCart";
+import CartDrawer from "../components/Storefront/CartDrawer";
 
 /* ─── Mini helper character beside buy button ────────────────────────── */
 function HelperCharacter({ primary, accent }) {
@@ -98,6 +100,15 @@ function formatValue(val) {
   if(typeof val==="object") return JSON.stringify(val);
   return String(val);
 }
+function warrantyLabel(months) {
+  const m = parseInt(months);
+  if(!m||m<=0) return null;
+  if(m%12===0){
+    const yrs=m/12;
+    return `${yrs} ${yrs===1?"year":"years"}`;
+  }
+  return `${m} ${m===1?"month":"months"}`;
+}
 function getFallback(type) {
   const label = type==="product"?"Product":"Service";
   const bg    = type==="product"?"6366f1":"8b5cf6";
@@ -116,7 +127,13 @@ function getFallback(type) {
   )}`;
 }
 
-const SKIP = new Set(["id","org_id","category_id","workspace_id","is_active","created_at","updated_at","image_url"]);
+const SKIP = new Set([
+  "id","org_id","category_id","workspace_id","is_active","created_at","updated_at","image_url",
+  // internal/admin-only fields — never show to customers
+  "sku","barcode","cost_price","min_stock","custom_fields","serial_number","reserved_quantity",
+  // handled separately with custom display logic below
+  "quantity","has_warranty","warranty_months",
+]);
 
 const DEFAULT_REVIEWS = [
   { id:1, name:"Ravin",   avatar:"R", rating:5, text:"Great quality and fast response. Highly recommend this seller!", color:"#6366f1" },
@@ -170,9 +187,13 @@ export default function StorefrontItemDetail() {
   const [error,      setError]      = useState(null);
   const [injected,   setInjected]   = useState(false);
   const [showModal,  setShowModal]  = useState(false);
+  const [showCart,   setShowCart]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successInv, setSuccessInv] = useState(null);
   const [form,       setForm]       = useState({ name:"", email:"", phone:"" });
+  const [selQty,     setSelQty]     = useState(1);
+
+  const cart = useCart(slug);
 
   useEffect(()=>{
     if(!injected){
@@ -207,7 +228,7 @@ export default function StorefrontItemDetail() {
     setSubmitting(true);
     try {
       const res = await api.post(`/store/${slug}/order`,{
-        type, item_id:id,
+        items: [{ type, item_id:id, quantity:selQty }],
         customer_name:  form.name.trim(),
         customer_email: form.email.trim()||undefined,
         customer_phone: form.phone.trim()||undefined,
@@ -258,6 +279,29 @@ export default function StorefrontItemDetail() {
   const gradEnd      = isProduct ? accent  : primary;
   const detailEntries= Object.entries(item).filter(([k])=>!SKIP.has(k));
 
+  /* ── stock availability ── */
+  const hasStock  = item.quantity!==undefined && item.quantity!==null;
+  const stockQty  = Number(item.quantity)||0;
+  const outOfStock= hasStock && stockQty<=0;
+  const lowStock  = hasStock && stockQty>0 && stockQty<3;
+  const maxQty    = hasStock ? stockQty : undefined;
+
+  /* ── warranty ── */
+  const warranty = item.has_warranty ? warrantyLabel(item.warranty_months) : null;
+
+  const handleAddToCart = ()=>{
+    cart.add({
+      key: `${type}-${id}`,
+      type, id,
+      name: item.name,
+      price,
+      image_url: item.image_url,
+      unit: item.unit,
+      maxQty,
+    }, selQty);
+    toast.success(`${item.name} added to cart`);
+  };
+
   return (
     <div style={{ minHeight:"100vh",background:"#f0f2ff",fontFamily:font }}>
 
@@ -294,6 +338,24 @@ export default function StorefrontItemDetail() {
               {org.industry.replace(/_/g," ")}
             </span>
           )}
+
+          <button onClick={()=>setShowCart(true)}
+            style={{ position:"relative",display:"flex",alignItems:"center",gap:8,padding:"8px 16px",borderRadius:12,
+              border:"1px solid rgba(255,255,255,0.25)",background:"rgba(255,255,255,0.12)",
+              backdropFilter:"blur(8px)",color:"white",fontWeight:700,cursor:"pointer",fontSize:14,
+              fontFamily:font,transition:"all 0.2s" }}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.22)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.12)";}}>
+            <ShoppingCart size={15}/> Cart
+            {cart.totalCount>0 && (
+              <span style={{ position:"absolute",top:-6,right:-6,minWidth:20,height:20,borderRadius:999,
+                background:accent,color:"white",fontSize:11,fontWeight:800,
+                display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px",
+                border:"2px solid "+hdr }}>
+                {cart.totalCount}
+              </span>
+            )}
+          </button>
         </div>
       </nav>
 
@@ -419,18 +481,59 @@ export default function StorefrontItemDetail() {
                 </p>
               )}
 
+              {/* Quantity selector */}
+              {!outOfStock && (
+                <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:18 }}>
+                  <span style={{ fontSize:12,fontWeight:700,color:"#475569",
+                    textTransform:"uppercase",letterSpacing:"0.05em" }}>
+                    Quantity
+                  </span>
+                  <div style={{ display:"flex",alignItems:"center",gap:4,
+                    border:`1.5px solid ${chipCol}33`,borderRadius:10,padding:3 }}>
+                    <button onClick={()=>setSelQty(q=>Math.max(1,q-1))} disabled={selQty<=1}
+                      style={{ width:30,height:30,border:"none",background:"transparent",borderRadius:8,
+                        cursor:selQty<=1?"not-allowed":"pointer",color:chipCol,opacity:selQty<=1?0.4:1,
+                        display:"flex",alignItems:"center",justifyContent:"center" }}>
+                      <Minus size={13}/>
+                    </button>
+                    <span style={{ minWidth:32,textAlign:"center",fontWeight:800,fontSize:15,color:"#0f172a" }}>
+                      {selQty}
+                    </span>
+                    <button onClick={()=>setSelQty(q=>maxQty!=null?Math.min(maxQty,q+1):q+1)}
+                      disabled={maxQty!=null && selQty>=maxQty}
+                      style={{ width:30,height:30,border:"none",background:"transparent",borderRadius:8,
+                        cursor:(maxQty!=null && selQty>=maxQty)?"not-allowed":"pointer",color:chipCol,
+                        opacity:(maxQty!=null && selQty>=maxQty)?0.4:1,
+                        display:"flex",alignItems:"center",justifyContent:"center" }}>
+                      <Plus size={13}/>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Order button row with helper character */}
               <div style={{ display:"flex", alignItems:"flex-end", gap:16 }}>
                 <div style={{ flex:1 }}>
-                  <button className="sfi-pay-btn" onClick={()=>setShowModal(true)}
-                    style={{ width:"100%",padding:"16px 0",borderRadius:16,border:"none",fontFamily:font,
-                      background:`linear-gradient(135deg,${gradStart},${gradEnd})`,
-                      color:"white",fontWeight:800,fontSize:17,cursor:"pointer",
-                      display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-                      transition:"transform 0.2s,box-shadow 0.2s",letterSpacing:"-0.01em" }}>
-                    <CreditCard size={18} style={{ filter:"drop-shadow(0 0 6px rgba(255,255,255,0.8))" }}/>
-                    Place Order
-                  </button>
+                  <div style={{ display:"flex",gap:10 }}>
+                    <button onClick={handleAddToCart} disabled={outOfStock}
+                      style={{ flex:1,padding:"15px 0",borderRadius:16,fontFamily:font,
+                        border:`2px solid ${chipCol}`,background:"white",color:chipCol,
+                        fontWeight:800,fontSize:15,cursor:outOfStock?"not-allowed":"pointer",
+                        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                        opacity:outOfStock?0.4:1 }}>
+                      <ShoppingCart size={17}/> Add to Cart
+                    </button>
+                    <button className={outOfStock?"":"sfi-pay-btn"} onClick={()=>setShowModal(true)}
+                      disabled={outOfStock}
+                      style={{ flex:1,padding:"15px 0",borderRadius:16,border:"none",fontFamily:font,
+                        background: outOfStock ? "#cbd5e1" : `linear-gradient(135deg,${gradStart},${gradEnd})`,
+                        color:"white",fontWeight:800,fontSize:15,cursor: outOfStock ? "not-allowed" : "pointer",
+                        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                        transition:"transform 0.2s,box-shadow 0.2s",letterSpacing:"-0.01em" }}>
+                      <CreditCard size={17} style={{ filter:"drop-shadow(0 0 6px rgba(255,255,255,0.8))" }}/>
+                      {outOfStock ? "Out of Stock" : "Buy Now"}
+                    </button>
+                  </div>
                   <p style={{ textAlign:"center",fontSize:12,color:"#94a3b8",marginTop:8,marginBottom:0 }}>
                     Bank transfer · We will contact you shortly
                   </p>
@@ -458,6 +561,23 @@ export default function StorefrontItemDetail() {
               </div>
 
               <div style={{ display:"grid",gap:2 }}>
+                {hasStock && (
+                  <div className="sfi-detail-row"
+                    style={{ display:"grid",gridTemplateColumns:"120px minmax(0,1fr)",gap:8,
+                      fontSize:13,alignItems:"start",animation:"fadeIn 0.3s both" }}>
+                    <span style={{ color:"#94a3b8",fontWeight:700,fontSize:12,
+                      textTransform:"uppercase",letterSpacing:"0.04em",paddingTop:2 }}>
+                      Availability
+                    </span>
+                    {outOfStock ? (
+                      <span style={{ color:"#ef4444",fontWeight:800 }}>Out of Stock</span>
+                    ) : lowStock ? (
+                      <span style={{ color:"#f59e0b",fontWeight:800 }}>Only {stockQty} left in stock!</span>
+                    ) : (
+                      <span style={{ color:"#22c55e",fontWeight:800 }}>In Stock</span>
+                    )}
+                  </div>
+                )}
                 {detailEntries.map(([key,val],i)=>(
                   <div key={key} className="sfi-detail-row"
                     style={{ display:"grid",gridTemplateColumns:"120px minmax(0,1fr)",gap:8,
@@ -472,6 +592,17 @@ export default function StorefrontItemDetail() {
                     </span>
                   </div>
                 ))}
+                {warranty && (
+                  <div className="sfi-detail-row"
+                    style={{ display:"grid",gridTemplateColumns:"120px minmax(0,1fr)",gap:8,
+                      fontSize:13,alignItems:"start",animation:"fadeIn 0.3s both" }}>
+                    <span style={{ color:"#94a3b8",fontWeight:700,fontSize:12,
+                      textTransform:"uppercase",letterSpacing:"0.04em",paddingTop:2 }}>
+                      Warranty
+                    </span>
+                    <span style={{ color:"#1e293b",fontWeight:500 }}>{warranty}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -626,7 +757,9 @@ export default function StorefrontItemDetail() {
                   </div>
                   <div>
                     <h3 style={{ margin:0,fontSize:18,fontWeight:900,color:"#0f172a" }}>Place Order</h3>
-                    <p style={{ margin:0,fontSize:13,color:"#94a3b8" }}>{item.name} · {fmt(price)}</p>
+                    <p style={{ margin:0,fontSize:13,color:"#94a3b8" }}>
+                      {item.name} · {selQty} × {fmt(price)} = <strong style={{ color:"#0f172a" }}>{fmt(price*selQty)}</strong>
+                    </p>
                   </div>
                 </div>
 
@@ -674,6 +807,23 @@ export default function StorefrontItemDetail() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ═══ CART DRAWER ═══ */}
+      {showCart && (
+        <CartDrawer
+          slug={slug}
+          cart={cart.cart}
+          updateQty={cart.updateQty}
+          remove={cart.remove}
+          clear={cart.clear}
+          onClose={()=>setShowCart(false)}
+          currency={currency}
+          primary={primary}
+          accent={accent}
+          second={second}
+          font={font}
+        />
       )}
     </div>
   );
