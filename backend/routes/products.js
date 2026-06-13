@@ -259,6 +259,19 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    // Block deletion if the product is linked to existing invoices
+    const linkedInvoices = await db(
+      "SELECT 1 FROM wabyone_invoice_items WHERE product_id = $1 LIMIT 1",
+      [req.params.id],
+    );
+
+    if (linkedInvoices.rows.length > 0) {
+      return res.status(400).json({
+        error:
+          "Cannot delete this product because it is linked to existing invoices. Please archive or disable it instead.",
+      });
+    }
+
     const imageUrl = existing.rows[0].image_url;
 
     // Delete from DB

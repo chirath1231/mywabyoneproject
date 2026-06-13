@@ -272,8 +272,8 @@ export default function Products() {
       await api.delete(`/products/${id}`);
       toast.success("Product deleted");
       loadProducts();
-    } catch {
-      toast.error("Failed to delete product");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to delete product");
     }
   };
 
