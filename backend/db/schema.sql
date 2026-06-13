@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS wabyone_products (
     unit VARCHAR(50) DEFAULT 'pcs',
     image_url TEXT,
     is_active BOOLEAN DEFAULT true,
+    status VARCHAR(10) NOT NULL DEFAULT 'active',
     custom_fields JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
