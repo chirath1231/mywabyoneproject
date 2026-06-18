@@ -278,7 +278,7 @@ export default function Services() {
         .sv-btn{padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer;transition:.18s;}
         .sv-btn:hover{background:var(--bg-primary);}
         .sv-btn-primary{border:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;box-shadow:0 6px 16px rgba(99,102,241,.28);}
-        .sv-btn-primary:hover{filter:brightness(1.08);}
+        .sv-btn-primary:hover{background:linear-gradient(135deg,#6366f1,#8b5cf6);filter:brightness(1.1);color:#fff;}
 
         /* Pagination */
         .sv-pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;}
