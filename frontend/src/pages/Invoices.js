@@ -99,8 +99,10 @@ export default function Invoices() {
   };
 
   const removeItem = (idx) => {
-    if (form.items.length === 1) return;
-    setForm({ ...form, items: form.items.filter((_, i) => i !== idx) });
+    setForm((prev) => {
+      if (prev.items.length === 1) return prev;
+      return { ...prev, items: prev.items.filter((_, i) => i !== idx) };
+    });
   };
 
   const getAvailableStock = (productId) => {
@@ -129,6 +131,7 @@ export default function Invoices() {
       if (product) {
         items[idx].description = product.name;
         items[idx].unit_price = parseFloat(product.price);
+        items[idx].quantity = 1;
         items[idx].service_id = "";
       }
     }
@@ -137,6 +140,7 @@ export default function Invoices() {
       if (service) {
         items[idx].description = service.name;
         items[idx].unit_price = parseFloat(service.price);
+        items[idx].quantity = 1;
         items[idx].product_id = "";
       }
     }
@@ -634,14 +638,16 @@ export default function Invoices() {
                             }
                           />
                         </div>
-                        <button
-                          type="button"
-                          className="btn-icon"
-                          onClick={() => removeItem(idx)}
-                          style={{ color: "var(--danger)", height: 38 }}
-                        >
-                          <X size={16} />
-                        </button>
+                        {form.items.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            onClick={() => removeItem(idx)}
+                            style={{ color: "var(--danger)", height: 38 }}
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
                       </div>
                     ))}
                     <button
