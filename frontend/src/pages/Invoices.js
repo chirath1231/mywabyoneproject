@@ -399,7 +399,7 @@ export default function Invoices() {
                             </button>
                           )}
 
-                          {inv.status !== "cancelled" && (
+                          {inv.status !== "cancelled" && inv.status !== "paid" && (
                             <button
                               className="btn-icon"
                               onClick={() => updateStatus(inv.id, "cancelled")}
@@ -410,14 +410,16 @@ export default function Invoices() {
                             </button>
                           )}
 
-                          <button
-                            className="btn-icon"
-                            onClick={() => handleDelete(inv.id)}
-                            style={{ color: "var(--danger)" }}
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {inv.status !== "paid" && (
+                            <button
+                              className="btn-icon"
+                              onClick={() => handleDelete(inv.id)}
+                              style={{ color: "var(--danger)" }}
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -916,7 +918,7 @@ export default function Invoices() {
                     <CheckCircle size={16} /> Mark as Paid
                   </button>
                 )}
-                {showDetail.status !== "cancelled" && (
+                {showDetail.status !== "cancelled" && showDetail.status !== "paid" && (
                   <button
                     className="btn btn-secondary"
                     onClick={() => updateStatus(showDetail.id, "cancelled")}
