@@ -131,6 +131,7 @@ const SKIP = new Set([
   "id","org_id","category_id","workspace_id","is_active","created_at","updated_at","image_url",
   // internal/admin-only fields — never show to customers
   "sku","barcode","cost_price","min_stock","custom_fields","serial_number","reserved_quantity",
+  "unit","status","category_name",
   // handled separately with custom display logic below
   "quantity","has_warranty","warranty_months",
 ]);
