@@ -49,7 +49,12 @@ export default function CartDrawer({
   };
 
   const handlePlaceOrder = async () => {
-    if (!form.name.trim()) { toast.error("Please enter your name"); return; }
+    if (!form.name.trim()) {
+      toast.error("Please enter your name", {
+        style: { background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0" },
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post(`/store/${slug}/order`, {
@@ -61,7 +66,9 @@ export default function CartDrawer({
       setSuccessInv(res.data.invoice_number);
       clear();
     } catch (e) {
-      toast.error(e.response?.data?.error || "Something went wrong. Please try again.");
+      toast.error(e.response?.data?.error || "Something went wrong. Please try again.", {
+        style: { background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0" },
+      });
     } finally {
       setSubmitting(false);
     }

@@ -154,6 +154,7 @@ export default function App() {
           <WorkspaceProvider>
             <Toaster
               position="top-right"
+              containerStyle={{ zIndex: 99999 }}
               toastOptions={{
                 style: {
                   background: "var(--bg-secondary)",
