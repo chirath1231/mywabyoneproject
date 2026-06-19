@@ -112,6 +112,18 @@ export default function Invoices() {
   };
 
   const updateItem = (idx, field, value) => {
+    if ((field === "product_id" || field === "service_id") && value) {
+      const isDuplicate = form.items.some(
+        (item, i) => i !== idx && item[field] === value
+      );
+      if (isDuplicate) {
+        toast.error(
+          "This item is already added. Increase the quantity in the existing row instead."
+        );
+        return;
+      }
+    }
+
     if (field === "quantity") {
       const productId = form.items[idx].product_id;
       if (productId) {

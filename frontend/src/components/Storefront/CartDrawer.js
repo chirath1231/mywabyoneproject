@@ -187,9 +187,12 @@ export default function CartDrawer({
                   <div style={{ fontWeight: 800, fontSize: 13, minWidth: 64, textAlign: "right", color: "#0f172a" }}>
                     {fmt(c.price * c.quantity)}
                   </div>
-                  <button onClick={() => remove(c.key)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444",
-                      display: "flex", alignItems: "center", flexShrink: 0, padding: 4 }}>
+                  <button onClick={() => remove(c.key)} title="Remove item"
+                    style={{ background: "#fef2f2", border: "1.5px solid #fecaca", cursor: "pointer",
+                      color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, padding: 7, borderRadius: 8, transition: "background 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#fef2f2"; }}>
                     <Trash2 size={15} />
                   </button>
                 </div>
