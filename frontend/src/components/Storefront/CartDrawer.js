@@ -170,7 +170,9 @@ export default function CartDrawer({
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      overflow: "hidden", display: "-webkit-box",
+                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                      wordBreak: "break-word" }}>
                       {c.name}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>
