@@ -16,7 +16,12 @@ const dashboardRoutes    = require("./routes/dashboard");
 const onboardingRoutes   = require("./routes/onboarding");
 const workspaceRoutes    = require("./routes/workspaces");
 const storeRoutes        = require("./routes/store");
-const uploadRoutes       = require("./routes/uploadRoutes");   // ← NEW
+const uploadRoutes       = require("./routes/uploadRoutes");   // ←
+
+
+const whatsappRoutes = require("./routes/whatsapp");
+const whatsappAdminRoutes = require("./routes/whatsapp-admin");
+
 const { verifySmtp }     = require("./config/mail");
 
 const app = express();
@@ -82,7 +87,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-
 // ─────────────────────────────────────────────
 // RATE LIMITING
 // ─────────────────────────────────────────────
@@ -128,7 +132,9 @@ app.use("/api/dashboard",     dashboardRoutes);
 app.use("/api/onboarding",    onboardingRoutes);
 app.use("/api/workspaces",    workspaceRoutes);
 app.use("/api/store",         storeRoutes);
-app.use("/api/upload",        uploadRoutes);                   // ← NEW
+app.use("/api/upload",        uploadRoutes);
+app.use("/api/whatsapp",      whatsappRoutes);
+app.use("/api/whatsapp/admin", whatsappAdminRoutes);
 
 // ─────────────────────────────────────────────
 // API ROOT

@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
   Bell,
+  MessageCircle,
   LogOut,
   Moon,
   Sun,
@@ -92,6 +93,12 @@ export default function Sidebar() {
       to: "/notifications",
       icon: Bell,
       label: t("notifications", "Notifications"),
+      section: "communication",
+    },
+    {
+      to: "/whatsapp",
+      icon: MessageCircle,
+      label: t("whatsapp", "WhatsApp"),
       section: "communication",
     },
     {
