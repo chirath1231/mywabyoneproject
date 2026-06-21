@@ -1,7 +1,7 @@
 // src/components/whatsapp/InstanceCard.js
 import { useState } from "react";
 import StatusBadge from "./StatusBadge";
-import { updateSystemPrompt, setAiEnabled, disconnectInstance } from "../../api/whatsapp";
+import { updateSystemPrompt, setAiEnabled, disconnectInstance, refreshWebhook } from "../../api/whatsapp";
 import "./whatsapp.css";
 
 export default function InstanceCard({ instance, onChanged }) {
@@ -10,6 +10,7 @@ export default function InstanceCard({ instance, onChanged }) {
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const isConnected = instance.status === "authorized";
@@ -38,6 +39,18 @@ export default function InstanceCard({ instance, onChanged }) {
       alert(`Couldn't update: ${err.message}`);
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function handleRefreshWebhook() {
+    setRefreshing(true);
+    try {
+      await refreshWebhook(instance.id);
+      alert("Webhook refreshed — auto-reply should now work.");
+    } catch (err) {
+      alert(`Couldn't refresh webhook: ${err.message}`);
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -111,6 +124,14 @@ export default function InstanceCard({ instance, onChanged }) {
       )}
 
       <div className="wa-card__footer">
+        <button
+          className="wa-button wa-button--secondary-text"
+          onClick={handleRefreshWebhook}
+          disabled={refreshing || !isConnected}
+          title="Re-register the webhook URL with Green API (fixes auto-reply after server URL changes)"
+        >
+          {refreshing ? "Refreshing…" : "Refresh Webhook"}
+        </button>
         <button
           className="wa-button wa-button--danger-text"
           onClick={handleDisconnect}

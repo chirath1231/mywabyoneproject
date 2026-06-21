@@ -194,7 +194,8 @@
 
 .wa-card__footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   border-top: 1px solid var(--wa-border);
   padding-top: 10px;
 }
@@ -322,6 +323,17 @@
 }
 .wa-button--secondary:hover:not(:disabled) {
   background: var(--wa-bg);
+}
+
+.wa-button--secondary-text {
+  background: none;
+  border: none;
+  color: var(--wa-text-muted, #6b7280);
+  padding: 4px 0;
+}
+.wa-button--secondary-text:hover:not(:disabled) {
+  color: var(--wa-text, #111827);
+  text-decoration: underline;
 }
 
 .wa-button--danger-text {
