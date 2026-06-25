@@ -1,0 +1,555 @@
+/* src/components/whatsapp/whatsapp.css */
+
+:root {
+  --wa-bg: #f7f8fa;
+  --wa-surface: #ffffff;
+  --wa-border: #e3e6ea;
+  --wa-text: #1a1d21;
+  --wa-text-muted: #6b7280;
+  --wa-accent: #128c5b;
+  --wa-accent-hover: #0e7049;
+  --wa-accent-soft: #e6f6ee;
+  --wa-success: #1fa855;
+  --wa-warning: #b9790a;
+  --wa-warning-soft: #fdf3e0;
+  --wa-danger: #d6453d;
+  --wa-danger-soft: #fbe9e8;
+  --wa-radius: 10px;
+}
+
+/* ---------- Page shell ---------- */
+
+.wa-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  color: var(--wa-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.wa-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.wa-page__title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.wa-page__subtitle {
+  font-size: 14px;
+  color: var(--wa-text-muted);
+  margin: 0;
+}
+
+.wa-page__loading,
+.wa-page__error {
+  padding: 24px;
+  border-radius: var(--wa-radius);
+  background: var(--wa-surface);
+  border: 1px solid var(--wa-border);
+  color: var(--wa-text-muted);
+  font-size: 14px;
+}
+
+.wa-page__error {
+  background: var(--wa-danger-soft);
+  border-color: #f3c9c6;
+  color: var(--wa-danger);
+}
+
+/* ---------- Empty state ---------- */
+
+.wa-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px;
+  border: 1.5px dashed var(--wa-border);
+  border-radius: var(--wa-radius);
+  background: var(--wa-surface);
+}
+
+.wa-empty__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--wa-accent-soft);
+  color: var(--wa-accent);
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.wa-empty__title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.wa-empty__subtitle {
+  font-size: 14px;
+  color: var(--wa-text-muted);
+  margin: 0 0 20px;
+  max-width: 360px;
+}
+
+/* ---------- Grid + Card ---------- */
+
+.wa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.wa-card {
+  background: var(--wa-surface);
+  border: 1px solid var(--wa-border);
+  border-radius: var(--wa-radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wa-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wa-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.wa-card__phone {
+  font-size: 13px;
+  color: var(--wa-text-muted);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.wa-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wa-card__row-label {
+  font-size: 14px;
+  color: var(--wa-text);
+}
+
+.wa-card__expand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--wa-border);
+  padding: 10px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wa-accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+.wa-card__chevron {
+  transition: transform 0.15s ease;
+  font-size: 16px;
+}
+
+.wa-card__chevron--up {
+  transform: rotate(180deg);
+}
+
+.wa-card__prompt-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-card__prompt-label {
+  font-size: 12px;
+  color: var(--wa-text-muted);
+}
+
+.wa-card__prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.wa-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--wa-border);
+  padding-top: 10px;
+}
+
+/* ---------- Badge ---------- */
+
+.wa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.wa-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.wa-badge--success {
+  background: var(--wa-accent-soft);
+  color: var(--wa-success);
+}
+.wa-badge--success .wa-badge__dot {
+  background: var(--wa-success);
+}
+
+.wa-badge--warning {
+  background: var(--wa-warning-soft);
+  color: var(--wa-warning);
+}
+.wa-badge--warning .wa-badge__dot {
+  background: var(--wa-warning);
+  animation: wa-pulse 1.4s ease-in-out infinite;
+}
+
+.wa-badge--danger {
+  background: var(--wa-danger-soft);
+  color: var(--wa-danger);
+}
+.wa-badge--danger .wa-badge__dot {
+  background: var(--wa-danger);
+}
+
+.wa-badge--neutral {
+  background: #eef0f2;
+  color: var(--wa-text-muted);
+}
+.wa-badge--neutral .wa-badge__dot {
+  background: var(--wa-text-muted);
+}
+
+/* ---------- Toggle ---------- */
+
+.wa-toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: #d8dce1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.wa-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wa-toggle--on {
+  background: var(--wa-accent);
+}
+
+.wa-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.wa-toggle--on .wa-toggle__knob {
+  transform: translateX(16px);
+}
+
+/* ---------- Buttons ---------- */
+
+.wa-button {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.wa-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wa-button--primary {
+  background: var(--wa-accent);
+  color: #fff;
+}
+.wa-button--primary:hover:not(:disabled) {
+  background: var(--wa-accent-hover);
+}
+
+.wa-button--secondary {
+  background: var(--wa-surface);
+  border-color: var(--wa-border);
+  color: var(--wa-text);
+}
+.wa-button--secondary:hover:not(:disabled) {
+  background: var(--wa-bg);
+}
+
+.wa-button--secondary-text {
+  background: none;
+  border: none;
+  color: var(--wa-text-muted, #6b7280);
+  padding: 4px 0;
+}
+.wa-button--secondary-text:hover:not(:disabled) {
+  color: var(--wa-text, #111827);
+  text-decoration: underline;
+}
+
+.wa-button--danger-text {
+  background: none;
+  border: none;
+  color: var(--wa-danger);
+  padding: 4px 0;
+}
+.wa-button--danger-text:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.wa-button--small {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+/* ---------- Inputs ---------- */
+
+.wa-input,
+.wa-textarea {
+  width: 100%;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--wa-border);
+  border-radius: 8px;
+  color: var(--wa-text);
+  background: var(--wa-surface);
+  box-sizing: border-box;
+}
+
+.wa-input:focus,
+.wa-textarea:focus {
+  outline: none;
+  border-color: var(--wa-accent);
+  box-shadow: 0 0 0 3px var(--wa-accent-soft);
+}
+
+.wa-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* ---------- Modal ---------- */
+
+.wa-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 20, 24, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.wa-modal {
+  position: relative;
+  background: var(--wa-surface);
+  border-radius: 14px;
+  padding: 32px 28px 28px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.wa-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wa-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--wa-text-muted);
+  cursor: pointer;
+}
+
+.wa-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.wa-modal__subtitle {
+  font-size: 13px;
+  color: var(--wa-text-muted);
+  margin: 0 0 8px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.wa-modal__subtitle--error {
+  color: var(--wa-danger);
+}
+
+.wa-modal__hint {
+  font-size: 13px;
+  color: var(--wa-text-muted);
+  margin-top: 12px;
+}
+
+.wa-modal__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.wa-modal__center .wa-button {
+  margin-top: 12px;
+}
+
+/* ---------- QR frame ---------- */
+
+.wa-qr-frame {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 12px 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wa-qr-frame__img {
+  width: 180px;
+  height: 180px;
+  border-radius: 8px;
+  position: relative;
+  z-index: 1;
+  background: #fff;
+  padding: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.wa-qr-frame__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  border: 2px solid var(--wa-accent);
+  opacity: 0;
+  animation: wa-qr-pulse 1.8s ease-out infinite;
+}
+
+@keyframes wa-qr-pulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.06);
+    opacity: 0;
+  }
+}
+
+@keyframes wa-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Spinner ---------- */
+
+.wa-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--wa-border);
+  border-top-color: var(--wa-accent);
+  border-radius: 50%;
+  animation: wa-spin 0.7s linear infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes wa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Success check ---------- */
+
+.wa-success-check {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wa-accent-soft);
+  color: var(--wa-success);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-qr-frame__pulse,
+  .wa-badge--warning .wa-badge__dot,
+  .wa-spinner {
+    animation: none;
+  }
+}
