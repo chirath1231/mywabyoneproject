@@ -144,7 +144,7 @@ router.get("/summary", auth, async (req, res) => {
         [orgId, wsId, prevStart, prevEnd]
       ),
 
-      // All paid invoices in period for PDF detail
+      // All invoices in period for PDF detail
       db(
         `SELECT
            i.invoice_number,
@@ -155,7 +155,8 @@ router.get("/summary", auth, async (req, res) => {
            c.last_name  as customer_last_name
          FROM wabyone_invoices i
          LEFT JOIN wabyone_customers c ON i.customer_id = c.id
-         WHERE i.org_id = $1 ${wsFilter}
+         WHERE i.org_id = $1
+           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
            AND i.created_at >= $3 AND i.created_at <= $4
          ORDER BY i.created_at DESC
          LIMIT 100`,
@@ -170,7 +171,7 @@ router.get("/summary", auth, async (req, res) => {
       ? ((currentRevenue - prevRevenue) / prevRevenue) * 100
       : null;
 
-    const totalPaid     = parseInt(stats.total_paid);
+    const totalPaid     = parseInt(stats.paid);
     const totalInvoices = parseInt(stats.total);
     const collectionRate = totalInvoices > 0 ? (totalPaid / totalInvoices) * 100 : 0;
 
