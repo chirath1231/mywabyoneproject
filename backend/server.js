@@ -19,6 +19,7 @@ const storeRoutes        = require("./routes/store");
 const uploadRoutes       = require("./routes/uploadRoutes");   // ←
 
 
+const reportsRoutes      = require("./routes/reports");
 const whatsappRoutes = require("./routes/whatsapp");
 const whatsappAdminRoutes = require("./routes/whatsapp-admin");
 
@@ -133,6 +134,7 @@ app.use("/api/onboarding",    onboardingRoutes);
 app.use("/api/workspaces",    workspaceRoutes);
 app.use("/api/store",         storeRoutes);
 app.use("/api/upload",        uploadRoutes);
+app.use("/api/reports",       reportsRoutes);
 app.use("/api/whatsapp",      whatsappRoutes);
 app.use("/api/whatsapp/admin", whatsappAdminRoutes);
 

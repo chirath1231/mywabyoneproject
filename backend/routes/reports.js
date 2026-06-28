@@ -1,0 +1,191 @@
+const express = require("express");
+const { query: db } = require("../config/db");
+const { auth } = require("../middleware/auth");
+
+const router = express.Router();
+
+router.get("/summary", auth, async (req, res) => {
+  try {
+    const orgId = req.user.orgId;
+    const wsId = req.user.workspaceId || null;
+    const wsFilter = "AND (workspace_id = $2 OR ($2::uuid IS NULL AND workspace_id IS NULL))";
+
+    const [
+      invoiceStats,
+      monthlyRevenue,
+      topCustomers,
+      topProducts,
+      topServices,
+      paymentMetrics,
+      prevPeriodRevenue,
+    ] = await Promise.all([
+      // Invoice status breakdown + totals
+      db(
+        `SELECT
+           COUNT(*) as total,
+           COUNT(*) FILTER (WHERE status = 'paid') as paid,
+           COUNT(*) FILTER (WHERE status = 'draft') as draft,
+           COUNT(*) FILTER (WHERE status = 'sent') as sent,
+           COUNT(*) FILTER (WHERE status = 'overdue') as overdue,
+           COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+           COALESCE(SUM(total), 0) as total_billed,
+           COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) as total_collected,
+           COALESCE(SUM(total) FILTER (WHERE status = 'overdue'), 0) as total_overdue,
+           COALESCE(AVG(total) FILTER (WHERE status = 'paid'), 0) as avg_invoice_value
+         FROM wabyone_invoices WHERE org_id = $1 ${wsFilter}`,
+        [orgId, wsId]
+      ),
+
+      // Monthly revenue (last 12 months)
+      db(
+        `SELECT
+           TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YY') as month,
+           DATE_TRUNC('month', created_at) as month_date,
+           COALESCE(SUM(total), 0) as revenue,
+           COUNT(*) as invoice_count
+         FROM wabyone_invoices
+         WHERE org_id = $1 AND status = 'paid'
+           AND created_at >= NOW() - INTERVAL '12 months'
+           ${wsFilter}
+         GROUP BY DATE_TRUNC('month', created_at)
+         ORDER BY month_date`,
+        [orgId, wsId]
+      ),
+
+      // Top 5 customers by revenue
+      db(
+        `SELECT
+           c.first_name, c.last_name,
+           COUNT(i.id) as invoice_count,
+           COALESCE(SUM(i.total) FILTER (WHERE i.status = 'paid'), 0) as total_paid,
+           COALESCE(SUM(i.total), 0) as total_billed
+         FROM wabyone_customers c
+         JOIN wabyone_invoices i ON i.customer_id = c.id
+         WHERE c.org_id = $1 ${wsFilter.replace('workspace_id', 'c.workspace_id').replace('($2::uuid IS NULL AND workspace_id IS NULL)', '($2::uuid IS NULL AND c.workspace_id IS NULL)')}
+         GROUP BY c.id, c.first_name, c.last_name
+         ORDER BY total_paid DESC
+         LIMIT 5`,
+        [orgId, wsId]
+      ),
+
+      // Top 5 products by revenue
+      db(
+        `SELECT
+           p.name,
+           SUM(ii.quantity) as units_sold,
+           COALESCE(SUM(ii.total), 0) as revenue
+         FROM wabyone_invoice_items ii
+         JOIN wabyone_products p ON ii.product_id = p.id
+         JOIN wabyone_invoices i ON ii.invoice_id = i.id
+         WHERE i.org_id = $1 AND i.status = 'paid'
+           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
+         GROUP BY p.id, p.name
+         ORDER BY revenue DESC
+         LIMIT 5`,
+        [orgId, wsId]
+      ),
+
+      // Top 5 services by revenue
+      db(
+        `SELECT
+           s.name,
+           SUM(ii.quantity) as units_sold,
+           COALESCE(SUM(ii.total), 0) as revenue
+         FROM wabyone_invoice_items ii
+         JOIN wabyone_services s ON ii.service_id = s.id
+         JOIN wabyone_invoices i ON ii.invoice_id = i.id
+         WHERE i.org_id = $1 AND i.status = 'paid'
+           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
+         GROUP BY s.id, s.name
+         ORDER BY revenue DESC
+         LIMIT 5`,
+        [orgId, wsId]
+      ),
+
+      // Payment metrics — avg days to pay
+      db(
+        `SELECT
+           COALESCE(AVG(EXTRACT(EPOCH FROM (paid_at - created_at)) / 86400), 0) as avg_days_to_pay,
+           COUNT(*) FILTER (WHERE paid_at IS NOT NULL AND due_date IS NOT NULL AND paid_at <= due_date) as paid_on_time,
+           COUNT(*) FILTER (WHERE paid_at IS NOT NULL) as total_paid_invoices
+         FROM wabyone_invoices
+         WHERE org_id = $1 AND status = 'paid' ${wsFilter}`,
+        [orgId, wsId]
+      ),
+
+      // Previous period (prior 12 months) revenue for growth comparison
+      db(
+        `SELECT COALESCE(SUM(total), 0) as revenue
+         FROM wabyone_invoices
+         WHERE org_id = $1 AND status = 'paid'
+           AND created_at >= NOW() - INTERVAL '24 months'
+           AND created_at < NOW() - INTERVAL '12 months'
+           ${wsFilter}`,
+        [orgId, wsId]
+      ),
+    ]);
+
+    const stats = invoiceStats.rows[0];
+    const currentRevenue = monthlyRevenue.rows.reduce((s, r) => s + parseFloat(r.revenue), 0);
+    const prevRevenue = parseFloat(prevPeriodRevenue.rows[0]?.revenue || 0);
+    const revenueGrowth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : null;
+
+    const totalPaid = parseInt(stats.total_paid);
+    const totalInvoices = parseInt(stats.total);
+    const collectionRate = totalInvoices > 0 ? (totalPaid / totalInvoices) * 100 : 0;
+
+    const pm = paymentMetrics.rows[0];
+    const onTimeRate = parseInt(pm.total_paid_invoices) > 0
+      ? (parseInt(pm.paid_on_time) / parseInt(pm.total_paid_invoices)) * 100
+      : 0;
+
+    res.json({
+      invoiceStats: {
+        total: totalInvoices,
+        paid: totalPaid,
+        draft: parseInt(stats.draft),
+        sent: parseInt(stats.sent),
+        overdue: parseInt(stats.overdue),
+        cancelled: parseInt(stats.cancelled),
+        totalBilled: parseFloat(stats.total_billed),
+        totalCollected: parseFloat(stats.total_collected),
+        totalOverdue: parseFloat(stats.total_overdue),
+        avgInvoiceValue: parseFloat(stats.avg_invoice_value),
+        collectionRate: Math.round(collectionRate * 10) / 10,
+      },
+      monthlyRevenue: monthlyRevenue.rows.map(r => ({
+        month: r.month,
+        revenue: parseFloat(r.revenue),
+        invoiceCount: parseInt(r.invoice_count),
+      })),
+      topCustomers: topCustomers.rows.map(c => ({
+        name: `${c.first_name} ${c.last_name}`,
+        invoiceCount: parseInt(c.invoice_count),
+        totalPaid: parseFloat(c.total_paid),
+        totalBilled: parseFloat(c.total_billed),
+      })),
+      topProducts: topProducts.rows.map(p => ({
+        name: p.name,
+        unitsSold: parseFloat(p.units_sold),
+        revenue: parseFloat(p.revenue),
+      })),
+      topServices: topServices.rows.map(s => ({
+        name: s.name,
+        unitsSold: parseFloat(s.units_sold),
+        revenue: parseFloat(s.revenue),
+      })),
+      paymentMetrics: {
+        avgDaysToPay: Math.round(parseFloat(pm.avg_days_to_pay) * 10) / 10,
+        onTimeRate: Math.round(onTimeRate * 10) / 10,
+      },
+      revenueGrowth,
+      currentRevenue,
+      prevRevenue,
+    });
+  } catch (err) {
+    console.error("Reports summary error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+module.exports = router;

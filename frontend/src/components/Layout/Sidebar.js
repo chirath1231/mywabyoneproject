@@ -11,6 +11,7 @@ import {
   Settings,
   Bell,
   MessageCircle,
+  BarChart2,
   LogOut,
   Moon,
   Sun,
@@ -87,6 +88,12 @@ export default function Sidebar() {
       to: "/invoices",
       icon: FileText,
       label: t("invoices", "Invoices"),
+      section: "finance",
+    },
+    {
+      to: "/reports",
+      icon: BarChart2,
+      label: t("reports", "Reports"),
       section: "finance",
     },
     {

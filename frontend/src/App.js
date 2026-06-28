@@ -30,6 +30,7 @@ import StorefrontItemDetail from "./pages/StorefrontItemDetail";
 import Tour from "./components/Tour";
 import VerifyOTP from "./pages/VerifyOTP";
 import WhatsAppPage from "./pages/WhatsAppPage";           // ← ADD
+import Reports from "./pages/Reports";
 
 
 function ProtectedRoute({ children }) {
@@ -142,6 +143,7 @@ function AppRoutes() {
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />     {/* ← ADD */}
+        <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
