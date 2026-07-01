@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import Header from "../components/Layout/Header";
 import api from "../api/api";
 import { useAuth } from "../context/AuthContext";
@@ -105,7 +106,10 @@ export default function Reports() {
         params: { startDate: activeDates.start, endDate: activeDates.end },
       })
       .then((res) => setData(res.data))
-      .catch((err) => console.error("Reports load error:", err))
+      .catch((err) => {
+        console.error("Reports load error:", err);
+        toast.error(err.response?.data?.error || "Failed to load report data");
+      })
       .finally(() => setLoading(false));
   }, [activeDates.start, activeDates.end]);
 

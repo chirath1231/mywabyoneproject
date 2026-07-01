@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import Header from "../components/Layout/Header";
 import api from "../api/api";
 import { useAuth } from "../context/AuthContext";
@@ -54,6 +55,7 @@ export default function Dashboard() {
       setData(res.data);
     } catch (err) {
       console.error("Dashboard load error:", err);
+      toast.error(err.response?.data?.error || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
