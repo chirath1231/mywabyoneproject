@@ -51,6 +51,7 @@ router.get("/summary", auth, async (req, res) => {
            COALESCE(SUM(total), 0)                                     as total_billed,
            COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0)      as total_collected,
            COALESCE(SUM(total) FILTER (WHERE status = 'overdue'), 0)   as total_overdue,
+           COALESCE(SUM(total) FILTER (WHERE status = 'sent'), 0)      as total_outstanding,
            COALESCE(AVG(total) FILTER (WHERE status = 'paid'), 0)      as avg_invoice_value
          FROM wabyone_invoices
          WHERE org_id = $1 ${invoiceWsFilter}
@@ -199,6 +200,7 @@ router.get("/summary", auth, async (req, res) => {
         totalBilled:    parseFloat(stats.total_billed),
         totalCollected: parseFloat(stats.total_collected),
         totalOverdue:   parseFloat(stats.total_overdue),
+        totalOutstanding: parseFloat(stats.total_outstanding),
         avgInvoiceValue: parseFloat(stats.avg_invoice_value),
         collectionRate: Math.round(collectionRate * 10) / 10,
       },

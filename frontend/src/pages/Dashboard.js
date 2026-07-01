@@ -153,7 +153,7 @@ export default function Dashboard() {
               <FileText size={24} />
             </div>
             <div className="stat-info">
-              <h3>{invoiceStats.total || 0}</h3>
+              <h3>{invoiceStats.paid || 0}</h3>
               <p>Total {t("invoices", "Invoices")}</p>
             </div>
           </div>
@@ -171,11 +171,7 @@ export default function Dashboard() {
               <TrendingUp size={24} />
             </div>
             <div className="stat-info">
-              <h3>
-                {formatCurrency(
-                  invoiceStats.total_amount - invoiceStats.paid_amount || 0,
-                )}
-              </h3>
+              <h3>{formatCurrency(invoiceStats.sent_amount || 0)}</h3>
               <p>Outstanding</p>
             </div>
           </div>

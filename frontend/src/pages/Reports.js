@@ -201,6 +201,7 @@ export default function Reports() {
           ["On-Time Payment Rate",`${paymentMetrics.onTimeRate}%`],
           ["YoY Revenue Growth",  revenueGrowth !== null ? `${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth.toFixed(1)}%` : "N/A"],
           ["Total Overdue Amount",fmtFull(invoiceStats.totalOverdue)],
+          ["Outstanding",         fmtFull(invoiceStats.totalOutstanding)],
         ],
         styles:     { fontSize: 9, cellPadding: 3 },
         headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: "bold" },
@@ -566,6 +567,7 @@ export default function Reports() {
                 label="Period-over-Period Growth"
               />
               <StatCard icon={<AlertCircle size={22} />} color="danger" value={fmt(invoiceStats.totalOverdue)} label="Overdue Amount" />
+              <StatCard icon={<TrendingUp  size={22} />} color="warning" value={fmt(invoiceStats.totalOutstanding)} label="Outstanding" />
             </div>
 
             {/* ── Charts row ──────────────────────────────────────────── */}

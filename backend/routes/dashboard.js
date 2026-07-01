@@ -48,7 +48,8 @@ router.get("/", auth, async (req, res) => {
             COUNT(*) FILTER (WHERE status = 'sent') as sent,
             COUNT(*) FILTER (WHERE status = 'overdue') as overdue,
             COALESCE(SUM(total), 0) as total_amount,
-            COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) as paid_amount
+            COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) as paid_amount,
+            COALESCE(SUM(total) FILTER (WHERE status = 'sent'), 0) as sent_amount
           FROM wabyone_invoices WHERE org_id = $1 ${invoiceWsFilter}`,
         [orgId, wsId],
       ),
@@ -94,6 +95,7 @@ router.get("/", auth, async (req, res) => {
           overdue: parseInt(invoices.rows[0].overdue),
           total_amount: parseFloat(invoices.rows[0].total_amount),
           paid_amount: parseFloat(invoices.rows[0].paid_amount),
+          sent_amount: parseFloat(invoices.rows[0].sent_amount),
         },
       },
       recentInvoices: recentInvoices.rows,
