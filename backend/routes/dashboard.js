@@ -13,6 +13,11 @@ router.get("/", auth, async (req, res) => {
       "AND (workspace_id = $2 OR ($2::uuid IS NULL AND workspace_id IS NULL))";
     const wsFilterAlias = (a) =>
       `AND (${a}.workspace_id = $2 OR ($2::uuid IS NULL AND ${a}.workspace_id IS NULL))`;
+    // Invoices without a workspace_id (e.g. storefront orders) should count in every
+    // workspace view, matching the permissive filter invoices.js already uses to list them.
+    const invoiceWsFilter = "AND (workspace_id = $2 OR workspace_id IS NULL)";
+    const invoiceWsFilterAlias = (a) =>
+      `AND (${a}.workspace_id = $2 OR ${a}.workspace_id IS NULL)`;
 
     const [
       products,
@@ -44,20 +49,20 @@ router.get("/", auth, async (req, res) => {
             COUNT(*) FILTER (WHERE status = 'overdue') as overdue,
             COALESCE(SUM(total), 0) as total_amount,
             COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) as paid_amount
-          FROM wabyone_invoices WHERE org_id = $1 ${wsFilter}`,
+          FROM wabyone_invoices WHERE org_id = $1 ${invoiceWsFilter}`,
         [orgId, wsId],
       ),
       db(
         `SELECT i.*, c.first_name as customer_first_name, c.last_name as customer_last_name
           FROM wabyone_invoices i
           LEFT JOIN wabyone_customers c ON i.customer_id = c.id
-          WHERE i.org_id = $1 ${wsFilterAlias("i")} ORDER BY i.created_at DESC LIMIT 5`,
+          WHERE i.org_id = $1 ${invoiceWsFilterAlias("i")} ORDER BY i.created_at DESC LIMIT 5`,
         [orgId, wsId],
       ),
       db(
         `SELECT DATE_TRUNC('month', created_at) as month, COALESCE(SUM(total), 0) as revenue
           FROM wabyone_invoices WHERE org_id = $1 AND status = 'paid'
-          AND created_at >= NOW() - INTERVAL '12 months' ${wsFilter}
+          AND created_at >= NOW() - INTERVAL '12 months' ${invoiceWsFilter}
           GROUP BY DATE_TRUNC('month', created_at) ORDER BY month`,
         [orgId, wsId],
       ),

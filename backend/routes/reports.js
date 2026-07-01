@@ -23,6 +23,10 @@ router.get("/summary", auth, async (req, res) => {
     const prevStart = new Date(startDate - periodMs);
 
     const wsFilter = "AND (workspace_id = $2 OR ($2::uuid IS NULL AND workspace_id IS NULL))";
+    // Invoices without a workspace_id (e.g. storefront orders) should count in every
+    // workspace view, matching the permissive filter invoices.js already uses to list them.
+    const invoiceWsFilter = "AND (workspace_id = $2 OR workspace_id IS NULL)";
+    const invoiceWsFilterAlias = (a) => `AND (${a}.workspace_id = $2 OR ${a}.workspace_id IS NULL)`;
 
     const [
       invoiceStats,
@@ -49,7 +53,7 @@ router.get("/summary", auth, async (req, res) => {
            COALESCE(SUM(total) FILTER (WHERE status = 'overdue'), 0)   as total_overdue,
            COALESCE(AVG(total) FILTER (WHERE status = 'paid'), 0)      as avg_invoice_value
          FROM wabyone_invoices
-         WHERE org_id = $1 ${wsFilter}
+         WHERE org_id = $1 ${invoiceWsFilter}
            AND created_at >= $3 AND created_at <= $4`,
         [orgId, wsId, startDate, endDate]
       ),
@@ -62,7 +66,7 @@ router.get("/summary", auth, async (req, res) => {
            COALESCE(SUM(total), 0)                            as revenue,
            COUNT(*)                                           as invoice_count
          FROM wabyone_invoices
-         WHERE org_id = $1 AND status = 'paid' ${wsFilter}
+         WHERE org_id = $1 AND status = 'paid' ${invoiceWsFilter}
            AND created_at >= $3 AND created_at <= $4
          GROUP BY DATE_TRUNC('month', created_at)
          ORDER BY month_date`,
@@ -97,7 +101,7 @@ router.get("/summary", auth, async (req, res) => {
          JOIN wabyone_products p  ON ii.product_id  = p.id
          JOIN wabyone_invoices i  ON ii.invoice_id  = i.id
          WHERE i.org_id = $1 AND i.status = 'paid'
-           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
+           ${invoiceWsFilterAlias("i")}
            AND i.created_at >= $3 AND i.created_at <= $4
          GROUP BY p.id, p.name
          ORDER BY revenue DESC
@@ -115,7 +119,7 @@ router.get("/summary", auth, async (req, res) => {
          JOIN wabyone_services s  ON ii.service_id = s.id
          JOIN wabyone_invoices i  ON ii.invoice_id = i.id
          WHERE i.org_id = $1 AND i.status = 'paid'
-           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
+           ${invoiceWsFilterAlias("i")}
            AND i.created_at >= $3 AND i.created_at <= $4
          GROUP BY s.id, s.name
          ORDER BY revenue DESC
@@ -130,7 +134,7 @@ router.get("/summary", auth, async (req, res) => {
            COUNT(*) FILTER (WHERE paid_at IS NOT NULL AND due_date IS NOT NULL AND paid_at <= due_date) as paid_on_time,
            COUNT(*) FILTER (WHERE paid_at IS NOT NULL) as total_paid_invoices
          FROM wabyone_invoices
-         WHERE org_id = $1 AND status = 'paid' ${wsFilter}
+         WHERE org_id = $1 AND status = 'paid' ${invoiceWsFilter}
            AND created_at >= $3 AND created_at <= $4`,
         [orgId, wsId, startDate, endDate]
       ),
@@ -139,7 +143,7 @@ router.get("/summary", auth, async (req, res) => {
       db(
         `SELECT COALESCE(SUM(total), 0) as revenue
          FROM wabyone_invoices
-         WHERE org_id = $1 AND status = 'paid' ${wsFilter}
+         WHERE org_id = $1 AND status = 'paid' ${invoiceWsFilter}
            AND created_at >= $3 AND created_at < $4`,
         [orgId, wsId, prevStart, prevEnd]
       ),
@@ -156,7 +160,7 @@ router.get("/summary", auth, async (req, res) => {
          FROM wabyone_invoices i
          LEFT JOIN wabyone_customers c ON i.customer_id = c.id
          WHERE i.org_id = $1
-           AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))
+           ${invoiceWsFilterAlias("i")}
            AND i.created_at >= $3 AND i.created_at <= $4
          ORDER BY i.created_at DESC
          LIMIT 100`,
