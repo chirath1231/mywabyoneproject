@@ -14,7 +14,7 @@ router.get("/", auth, async (req, res) => {
                FROM wabyone_invoices i
                LEFT JOIN wabyone_customers c ON i.customer_id = c.id
                WHERE i.org_id = $1
-                 AND (i.workspace_id = $2 OR i.workspace_id IS NULL)`;
+                 AND (i.workspace_id = $2 OR ($2::uuid IS NULL AND i.workspace_id IS NULL))`;
     const params = [req.user.orgId, req.user.workspaceId || null];
     let paramIdx = 3;
 
@@ -35,7 +35,7 @@ router.get("/", auth, async (req, res) => {
     const result = await db(sql, params);
     const countResult = await db(
       `SELECT COUNT(*) FROM wabyone_invoices WHERE org_id = $1
-         AND (workspace_id = $2 OR workspace_id IS NULL)`,
+         AND (workspace_id = $2 OR ($2::uuid IS NULL AND workspace_id IS NULL))`,
       [req.user.orgId, req.user.workspaceId || null],
     );
 
