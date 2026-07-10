@@ -22,6 +22,9 @@ const uploadRoutes       = require("./routes/uploadRoutes");   // ←
 const reportsRoutes      = require("./routes/reports");
 const whatsappRoutes = require("./routes/whatsapp");
 const whatsappAdminRoutes = require("./routes/whatsapp-admin");
+const expenseRoutes      = require("./routes/expenses");
+const supplierRoutes     = require("./routes/suppliers");
+const purchaseRoutes     = require("./routes/purchases");
 
 const { verifySmtp }     = require("./config/mail");
 
@@ -137,6 +140,9 @@ app.use("/api/upload",        uploadRoutes);
 app.use("/api/reports",       reportsRoutes);
 app.use("/api/whatsapp",      whatsappRoutes);
 app.use("/api/whatsapp/admin", whatsappAdminRoutes);
+app.use("/api/expenses",      expenseRoutes);
+app.use("/api/suppliers",     supplierRoutes);
+app.use("/api/purchases",     purchaseRoutes);
 
 // ─────────────────────────────────────────────
 // API ROOT

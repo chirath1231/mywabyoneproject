@@ -31,6 +31,8 @@ import Tour from "./components/Tour";
 import VerifyOTP from "./pages/VerifyOTP";
 import WhatsAppPage from "./pages/WhatsAppPage";           // ← ADD
 import Reports from "./pages/Reports";
+import Expenses from "./pages/Expenses";
+import Purchases from "./pages/Purchases";
 
 
 function ProtectedRoute({ children }) {
@@ -141,6 +143,8 @@ function AppRoutes() {
         <Route path="/services" element={<Services />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/invoices" element={<Invoices />} />
+        <Route path="/purchases" element={<Purchases />} />
+        <Route path="/expenses" element={<Expenses />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />     {/* ← ADD */}
         <Route path="/reports" element={<Reports />} />

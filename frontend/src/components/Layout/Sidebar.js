@@ -19,6 +19,8 @@ import {
   Plus,
   Check,
   Lock,
+  Receipt,
+  Truck,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -88,6 +90,18 @@ export default function Sidebar() {
       to: "/invoices",
       icon: FileText,
       label: t("invoices", "Invoices"),
+      section: "finance",
+    },
+    {
+      to: "/purchases",
+      icon: Truck,
+      label: t("purchases", "Purchases"),
+      section: "finance",
+    },
+    {
+      to: "/expenses",
+      icon: Receipt,
+      label: t("expenses", "Expenses"),
       section: "finance",
     },
     {
