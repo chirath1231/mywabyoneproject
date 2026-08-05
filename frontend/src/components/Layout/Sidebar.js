@@ -21,11 +21,16 @@ import {
   Lock,
   Receipt,
   Truck,
+  Building2,
+  ShoppingCart,
+  ShoppingBag,
+  UserCog,
+  ClipboardList,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole, hasModule } = useAuth();
   const { isDark, toggleDark } = useTheme();
   const { workspaces, current, switchWorkspace, t, plan, atLimit } =
     useWorkspace();
@@ -73,62 +78,108 @@ export default function Sidebar() {
       icon: Package,
       label: t("products", "Products"),
       section: "business",
+      module: "products",
     },
     {
       to: "/services",
       icon: Briefcase,
       label: t("services", "Services"),
       section: "business",
+      module: "services",
     },
     {
       to: "/customers",
       icon: Users,
       label: t("customers", "Customers"),
       section: "business",
+      module: "customers",
+    },
+    {
+      to: "/pos",
+      icon: ShoppingCart,
+      label: t("pos", "Point of Sale"),
+      section: "finance",
+      module: "pos",
+    },
+    {
+      to: "/sales",
+      icon: ShoppingBag,
+      label: t("sales", "Sales"),
+      section: "finance",
+      module: "sales",
     },
     {
       to: "/invoices",
       icon: FileText,
       label: t("invoices", "Invoices"),
       section: "finance",
+      module: "invoices",
     },
     {
       to: "/purchases",
       icon: Truck,
       label: t("purchases", "Purchases"),
       section: "finance",
+      module: "purchases",
+    },
+    {
+      to: "/suppliers",
+      icon: Building2,
+      label: t("suppliers", "Suppliers"),
+      section: "finance",
+      module: "suppliers",
     },
     {
       to: "/expenses",
       icon: Receipt,
       label: t("expenses", "Expenses"),
       section: "finance",
+      module: "expenses",
     },
     {
       to: "/reports",
       icon: BarChart2,
       label: t("reports", "Reports"),
       section: "finance",
+      module: "reports",
     },
     {
       to: "/notifications",
       icon: Bell,
       label: t("notifications", "Notifications"),
       section: "communication",
+      module: "notifications",
     },
     {
       to: "/whatsapp",
       icon: MessageCircle,
       label: t("whatsapp", "WhatsApp"),
       section: "communication",
+      module: "whatsapp",
     },
+    ...(hasRole(["owner", "admin"])
+      ? [
+          {
+            to: "/users",
+            icon: UserCog,
+            label: t("users", "Users"),
+            section: "system",
+          },
+          {
+            to: "/activity-log",
+            icon: ClipboardList,
+            label: t("activityLog", "Activity Log"),
+            section: "system",
+          },
+        ]
+      : []),
     {
       to: "/settings",
       icon: Settings,
       label: t("settings", "Settings"),
       section: "system",
     },
-  ];
+  ].filter((item) => !item.module || hasModule(item.module));
 
   const sections = {
     main: null,

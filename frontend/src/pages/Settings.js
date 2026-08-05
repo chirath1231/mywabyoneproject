@@ -15,10 +15,12 @@ import {
   Layers,
   Crown,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useLocation } from "react-router-dom";
+import AccessControlStudio from "../components/settings/AccessControlStudio";
 
 // Example workspace names for each industry preset
 const WORKSPACE_EXAMPLES = {
@@ -60,7 +62,7 @@ const mapOrgToForm = (org) => ({
 });
 
 export default function Settings() {
-  const { organization, updateOrganization, loading: authLoading } = useAuth();
+  const { organization, updateOrganization, hasRole, loading: authLoading } = useAuth();
   const { themes, currentTheme, setTheme, isDark, toggleDark } = useTheme();
   const ws = useWorkspace();
   const location = useLocation();
@@ -233,6 +235,9 @@ export default function Settings() {
     { id: "industry", label: "Industry Preset", icon: Sparkles },
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "custom-fields", label: "Custom Fields", icon: Plus },
+    ...(hasRole(["owner", "admin"])
+      ? [{ id: "access-control", label: "System & Access Control", icon: ShieldCheck }]
+      : []),
   ];
 
   const handleCreateWorkspace = async (e) => {
@@ -1061,6 +1066,12 @@ export default function Settings() {
               )}
             </div>
           </>
+        )}
+
+        {/* System & Access Control — same member/role/permission panel as
+            the standalone /users route; only owner/admin ever see the tab */}
+        {activeTab === "access-control" && hasRole(["owner", "admin"]) && (
+          <AccessControlStudio />
         )}
       </div>
     </>

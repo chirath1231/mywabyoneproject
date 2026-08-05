@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function Customers() {
   const { t: tWs } = useWorkspace();
+  const { organization } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -54,6 +56,13 @@ export default function Customers() {
     const timer = setTimeout(() => loadCustomers(), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: organization?.currency || "USD",
+    }).format(amount || 0);
+  };
 
   const resetForm = () => {
     setForm({
@@ -188,6 +197,7 @@ export default function Customers() {
                     <th>Contact</th>
                     <th>WhatsApp</th>
                     <th>Location</th>
+                    <th>Balance Due</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -269,6 +279,9 @@ export default function Customers() {
                       <td>{c.whatsapp || "-"}</td>
                       <td style={{ fontSize: 13 }}>
                         {[c.city, c.country].filter(Boolean).join(", ") || "-"}
+                      </td>
+                      <td style={{ color: parseFloat(c.balance_due) > 0 ? "var(--danger)" : "var(--text-muted)", fontWeight: 600 }}>
+                        {formatCurrency(c.balance_due)}
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 8 }}>

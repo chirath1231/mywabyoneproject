@@ -50,7 +50,12 @@ function getPeriodDates(key) {
   }
 }
 
-const PAYMENT_METHODS = ["cash", "card", "bank_transfer", "cheque", "other"];
+const PAYMENT_METHODS = ["cash", "card", "bank_transfer", "cheque", "credit", "other"];
+const REFUND_METHODS = [
+  { value: "Cash", label: "Cash" },
+  { value: "BankTransfer", label: "Bank Transfer" },
+  { value: "DeductSupplierDue", label: "Deduct from Supplier Due" },
+];
 
 const emptyItem = { product_id: "", description: "", quantity: 1, cost_rate: 0, new_sell_rate: "" };
 
@@ -86,7 +91,15 @@ export default function Purchases() {
 
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
+  const [paymentTarget, setPaymentTarget] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [purchaseReturns, setPurchaseReturns] = useState([]);
+  const [returnModal, setReturnModal] = useState(null);
+  const [returnQtys, setReturnQtys] = useState({});
+  const [returnReason, setReturnReason] = useState("");
+  const [returnRefundMethod, setReturnRefundMethod] = useState("Cash");
   const [form, setForm] = useState(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [showSupplierQuickAdd, setShowSupplierQuickAdd] = useState(false);
   const [supplierQuickForm, setSupplierQuickForm] = useState({ name: "", phone: "", email: "" });
@@ -194,8 +207,37 @@ export default function Purchases() {
 
   const resetForm = () => setForm(emptyForm);
 
+  // Payment method -> Amount Paid Now: auto-fills to the grand total for
+  // Cash/Card/Bank Transfer/Cheque, or resets to 0.00 for Credit, the
+  // instant the method changes. Remains fully editable afterward — this
+  // only sets a starting point, it never locks the field.
+  const applyPaymentMethodDefault = (method, formState) => {
+    if (method === "credit") return "0.00";
+    const subtotal = formState.items.reduce(
+      (sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.cost_rate) || 0),
+      0,
+    );
+    const vat = subtotal * ((parseFloat(formState.vat_percent) || 0) / 100);
+    const grand = subtotal + vat - (parseFloat(formState.discount) || 0) + (parseFloat(formState.shipping_charge) || 0);
+    return grand.toFixed(2);
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setForm((prev) => ({ ...prev, payment_method: method, amount_paid: applyPaymentMethodDefault(method, prev) }));
+  };
+
+  // Fire the same reset-on-transition logic on the create modal's initial
+  // mount with whatever the default method is, not just on explicit changes.
+  useEffect(() => {
+    if (showModal) {
+      setForm((prev) => ({ ...prev, amount_paid: applyPaymentMethodDefault(prev.payment_method, prev) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showModal]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFieldErrors({});
     for (const item of form.items) {
       if (!item.description) {
         toast.error("Every line item needs a product or description.");
@@ -203,10 +245,13 @@ export default function Purchases() {
       }
     }
     try {
+      // Clamp to MIN(entered, total) at submission time — never send a
+      // paid amount the server would have to reject as an overpayment.
+      const clampedPaid = Math.min(parseFloat(form.amount_paid) || 0, getGrandTotal());
       await api.post("/purchases", {
         ...form,
         supplier_id: form.supplier_id || null,
-        amount_paid: parseFloat(form.amount_paid) || 0,
+        amount_paid: clampedPaid,
         vat_percent: parseFloat(form.vat_percent) || 0,
         discount: parseFloat(form.discount) || 0,
         shipping_charge: parseFloat(form.shipping_charge) || 0,
@@ -224,7 +269,12 @@ export default function Purchases() {
       loadPurchases();
       loadStaticData();
     } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to record purchase");
+      const data = err.response?.data;
+      if (data?.field) {
+        setFieldErrors({ [data.field]: data.detail });
+      } else {
+        toast.error(data?.error || "Failed to record purchase");
+      }
     }
   };
 
@@ -265,12 +315,92 @@ export default function Purchases() {
     }
   };
 
+  const openPayment = (purchase) => {
+    setPaymentTarget(purchase);
+    setPaymentAmount("");
+  };
+
+  const submitPayment = async () => {
+    const remaining = parseFloat(paymentTarget.total) - parseFloat(paymentTarget.amount_paid);
+    const amt = Math.min(parseFloat(paymentAmount) || 0, remaining);
+    if (!amt || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    try {
+      await api.patch(`/purchases/${paymentTarget.id}/payment`, { amount: amt });
+      toast.success("Payment recorded");
+      setPaymentTarget(null);
+      loadPurchases();
+      loadStaticData();
+      if (showDetail) {
+        const res = await api.get(`/purchases/${showDetail.id}`);
+        setShowDetail(res.data);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to record payment");
+    }
+  };
+
   const viewPurchase = async (id) => {
     try {
       const res = await api.get(`/purchases/${id}`);
       setShowDetail(res.data);
+      const retRes = await api.get(`/purchases/${id}/returns`);
+      setPurchaseReturns(retRes.data);
     } catch (err) {
       toast.error("Failed to load purchase");
+    }
+  };
+
+  const openReturn = (purchase) => {
+    setReturnModal(purchase);
+    setReturnQtys({});
+    setReturnReason("");
+    setReturnRefundMethod("Cash");
+  };
+
+  // Row-level "Process Return" doesn't have the full item list (the list
+  // endpoint doesn't include line items) — fetch the full purchase first.
+  const openReturnForRow = async (id) => {
+    try {
+      const res = await api.get(`/purchases/${id}`);
+      openReturn(res.data);
+    } catch {
+      toast.error("Failed to load purchase");
+    }
+  };
+
+  const submitReturn = async () => {
+    const items = Object.entries(returnQtys)
+      .filter(([, qty]) => parseFloat(qty) > 0)
+      .map(([purchase_item_id, qty]) => ({ purchase_item_id, quantity: parseFloat(qty) }));
+
+    if (items.length === 0) {
+      toast.error("Enter a return quantity for at least one item");
+      return;
+    }
+    if (
+      returnRefundMethod === "DeductSupplierDue" &&
+      !(returnModal.payment_method === "credit" && parseFloat(returnModal.balance_due) > 0)
+    ) {
+      toast.error("Deduct-from-supplier-due is only valid for a Credit purchase with an outstanding balance.");
+      return;
+    }
+
+    try {
+      await api.post(`/purchases/${returnModal.id}/returns`, {
+        reason: returnReason,
+        refund_method: returnRefundMethod,
+        items,
+      });
+      toast.success("Return recorded");
+      setReturnModal(null);
+      loadPurchases();
+      loadStaticData();
+      viewPurchase(returnModal.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to record return");
     }
   };
 
@@ -485,29 +615,59 @@ export default function Purchases() {
                         <td style={{ fontSize: 13 }}>{new Date(p.purchase_date).toLocaleDateString()}</td>
                         <td>
                           <div style={{ display: "flex", gap: 8 }}>
+                            {/* View: always visible, always enabled */}
                             <button className="btn-icon" onClick={() => viewPurchase(p.id)} title="View">
                               <Eye size={16} />
                             </button>
+
+                            {/* Settle Remaining Balance: hidden if cancelled, fully returned,
+                                or nothing is left owing once DeductSupplierDue refunds are netted out */}
+                            {p.status !== "cancelled" &&
+                              p.return_status !== "full" &&
+                              parseFloat(p.netted_balance_due) > 0 && (
+                                <button className="btn-icon" onClick={() => openPayment(p)} title="Settle Remaining Balance">
+                                  <DollarSign size={16} />
+                                </button>
+                              )}
+
+                            {/* Process Return: hidden unless received; faded/locked once fully returned */}
+                            {p.status === "received" && (
+                              <button
+                                className="btn-icon"
+                                onClick={() => p.return_status !== "full" && openReturnForRow(p.id)}
+                                title={p.return_status === "full" ? "Fully returned" : "Process Return"}
+                                style={
+                                  p.return_status === "full"
+                                    ? { opacity: 0.4, pointerEvents: "none" }
+                                    : undefined
+                                }
+                              >
+                                <Truck size={16} />
+                              </button>
+                            )}
+
+                            {/* Approve / Cancel: only meaningful while a decision is outstanding */}
                             {p.status === "pending" && (
-                              <button
-                                className="btn-icon"
-                                onClick={() => updateStatus(p.id, "received")}
-                                style={{ color: "var(--success)" }}
-                                title="Mark Received"
-                              >
-                                <CheckCircle size={16} />
-                              </button>
+                              <>
+                                <button
+                                  className="btn-icon"
+                                  onClick={() => updateStatus(p.id, "received")}
+                                  style={{ color: "var(--success)" }}
+                                  title="Approve"
+                                >
+                                  <CheckCircle size={16} />
+                                </button>
+                                <button
+                                  className="btn-icon"
+                                  onClick={() => updateStatus(p.id, "cancelled")}
+                                  style={{ color: "var(--danger)" }}
+                                  title="Cancel"
+                                >
+                                  <Ban size={16} />
+                                </button>
+                              </>
                             )}
-                            {p.status !== "cancelled" && (
-                              <button
-                                className="btn-icon"
-                                onClick={() => updateStatus(p.id, "cancelled")}
-                                style={{ color: "var(--danger)" }}
-                                title="Cancel"
-                              >
-                                <Ban size={16} />
-                              </button>
-                            )}
+
                             <button
                               className="btn-icon"
                               onClick={() => handleDelete(p.id)}
@@ -543,10 +703,19 @@ export default function Purchases() {
                       <label>Invoice / Bill #</label>
                       <input
                         className="form-control"
+                        style={fieldErrors.bill_number ? { borderColor: "var(--danger)" } : undefined}
                         placeholder="e.g. INV-2026-0142"
                         value={form.bill_number}
-                        onChange={(e) => setForm({ ...form, bill_number: e.target.value })}
+                        onChange={(e) => {
+                          setForm({ ...form, bill_number: e.target.value });
+                          if (fieldErrors.bill_number) setFieldErrors({});
+                        }}
                       />
+                      {fieldErrors.bill_number && (
+                        <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
+                          {fieldErrors.bill_number}
+                        </div>
+                      )}
                     </div>
                     <div className="form-group">
                       <label>Supplier Invoice Date</label>
@@ -619,7 +788,7 @@ export default function Purchases() {
                       <select
                         className="form-control"
                         value={form.payment_method}
-                        onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                        onChange={(e) => handlePaymentMethodChange(e.target.value)}
                       >
                         {PAYMENT_METHODS.map((m) => (
                           <option key={m} value={m}>{m.replace("_", " ")}</option>
@@ -872,8 +1041,43 @@ export default function Purchases() {
                     </div>
                   </div>
                 </div>
+
+                {purchaseReturns.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Returns</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Items</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchaseReturns.map((r) => (
+                          <tr key={r.id}>
+                            <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                            <td>{r.items?.map((i) => `${i.product_name || "Item"} x${i.quantity}`).join(", ")}</td>
+                            <td style={{ fontWeight: 600 }}>{formatCurrency(r.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
+                {showDetail.status !== "cancelled" &&
+                  parseFloat(showDetail.total) - parseFloat(showDetail.amount_paid) > 0 && (
+                    <button className="btn btn-primary" onClick={() => openPayment(showDetail)}>
+                      <DollarSign size={16} /> Add Payment
+                    </button>
+                  )}
+                {showDetail.status === "received" && (
+                  <button className="btn btn-secondary" onClick={() => openReturn(showDetail)}>
+                    <Truck size={16} /> Return Items
+                  </button>
+                )}
                 {showDetail.status === "pending" && (
                   <button className="btn btn-success" onClick={() => updateStatus(showDetail.id, "received")}>
                     <CheckCircle size={16} /> Mark as Received
@@ -884,6 +1088,122 @@ export default function Purchases() {
                     <Ban size={16} /> Cancel
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Payment Modal */}
+        {paymentTarget && (
+          <div className="modal-overlay" onClick={() => setPaymentTarget(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+              <div className="modal-header">
+                <h3>Add Payment</h3>
+                <button className="btn-icon" onClick={() => setPaymentTarget(null)}><X size={18} /></button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 12, fontSize: 14 }}>
+                  Balance due: <strong>{formatCurrency(paymentTarget.total - paymentTarget.amount_paid)}</strong>
+                </div>
+                <label>Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setPaymentTarget(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={submitPayment}>Record Payment</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Return Items Modal */}
+        {returnModal && (
+          <div className="modal-overlay" onClick={() => setReturnModal(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+              <div className="modal-header">
+                <h3>Return Items</h3>
+                <button className="btn-icon" onClick={() => setReturnModal(null)}><X size={18} /></button>
+              </div>
+              <div className="modal-body">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Purchased</th>
+                      <th>Return Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnModal.items?.filter((i) => i.product_id).map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.product_name || item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.quantity}
+                            step="0.01"
+                            className="form-control"
+                            style={{ width: 90 }}
+                            value={returnQtys[item.id] || ""}
+                            onChange={(e) =>
+                              setReturnQtys({ ...returnQtys, [item.id]: e.target.value })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 14 }}>
+                  <label>Refund Method</label>
+                  <select
+                    className="form-control"
+                    value={returnRefundMethod}
+                    onChange={(e) => setReturnRefundMethod(e.target.value)}
+                  >
+                    {REFUND_METHODS.map((m) => (
+                      <option
+                        key={m.value}
+                        value={m.value}
+                        disabled={
+                          m.value === "DeductSupplierDue" &&
+                          !(returnModal.payment_method === "credit" && parseFloat(returnModal.balance_due) > 0)
+                        }
+                      >
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  {returnRefundMethod === "DeductSupplierDue" &&
+                    !(returnModal.payment_method === "credit" && parseFloat(returnModal.balance_due) > 0) && (
+                      <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
+                        Only available for a Credit purchase with an outstanding balance.
+                      </div>
+                    )}
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <label>Reason</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setReturnModal(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={submitReturn}>Record Return</button>
               </div>
             </div>
           </div>

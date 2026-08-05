@@ -11,6 +11,8 @@ import {
   Send,
   CheckCircle,
   Ban,
+  DollarSign,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
@@ -27,6 +29,12 @@ export default function Invoices() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
+  const [paymentTarget, setPaymentTarget] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [invoiceReturns, setInvoiceReturns] = useState([]);
+  const [returnModal, setReturnModal] = useState(null);
+  const [returnQtys, setReturnQtys] = useState({});
+  const [returnReason, setReturnReason] = useState("");
   const { organization } = useAuth();
 
   const [form, setForm] = useState({
@@ -248,12 +256,66 @@ export default function Invoices() {
     }
   };
 
+  const openPayment = (invoice) => {
+    setPaymentTarget(invoice);
+    setPaymentAmount("");
+  };
+
+  const submitPayment = async () => {
+    const amt = parseFloat(paymentAmount);
+    if (!amt || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    try {
+      await api.patch(`/invoices/${paymentTarget.id}/payment`, { amount: amt });
+      toast.success("Payment recorded");
+      setPaymentTarget(null);
+      loadData();
+      if (showDetail) {
+        const res = await api.get(`/invoices/${showDetail.id}`);
+        setShowDetail(res.data);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to record payment");
+    }
+  };
+
   const viewInvoice = async (id) => {
     try {
       const res = await api.get(`/invoices/${id}`);
       setShowDetail(res.data);
+      const retRes = await api.get(`/invoices/${id}/returns`);
+      setInvoiceReturns(retRes.data);
     } catch (err) {
       toast.error("Failed to load invoice");
+    }
+  };
+
+  const openReturn = (invoice) => {
+    setReturnModal(invoice);
+    setReturnQtys({});
+    setReturnReason("");
+  };
+
+  const submitReturn = async () => {
+    const items = Object.entries(returnQtys)
+      .filter(([, qty]) => parseFloat(qty) > 0)
+      .map(([product_id, qty]) => ({ product_id, quantity: parseFloat(qty) }));
+
+    if (items.length === 0) {
+      toast.error("Enter a return quantity for at least one item");
+      return;
+    }
+
+    try {
+      await api.post(`/invoices/${returnModal.id}/returns`, { reason: returnReason, items });
+      toast.success("Return recorded");
+      setReturnModal(null);
+      loadData();
+      viewInvoice(returnModal.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to record return");
     }
   };
 
@@ -908,10 +970,53 @@ export default function Invoices() {
                       <span>Total:</span>
                       <span>{formatCurrency(showDetail.total)}</span>
                     </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14 }}>
+                      <span>Paid:</span>
+                      <span>{formatCurrency(showDetail.amount_paid || 0)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14, color: "var(--danger)" }}>
+                      <span>Balance:</span>
+                      <span>{formatCurrency(showDetail.total - (showDetail.amount_paid || 0))}</span>
+                    </div>
                   </div>
                 </div>
+
+                {invoiceReturns.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Returns</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Items</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoiceReturns.map((r) => (
+                          <tr key={r.id}>
+                            <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                            <td>{r.items?.map((i) => `${i.product_name || "Item"} x${i.quantity}`).join(", ")}</td>
+                            <td style={{ fontWeight: 600 }}>{formatCurrency(r.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
+                {showDetail.status !== "cancelled" &&
+                  parseFloat(showDetail.total) - parseFloat(showDetail.amount_paid || 0) > 0 && (
+                    <button className="btn btn-primary" onClick={() => openPayment(showDetail)}>
+                      <DollarSign size={16} /> Add Payment
+                    </button>
+                  )}
+                {showDetail.status === "paid" && (
+                  <button className="btn btn-secondary" onClick={() => openReturn(showDetail)}>
+                    <RotateCcw size={16} /> Return Items
+                  </button>
+                )}
                 {showDetail.status === "draft" && (
                   <>
                     <button
@@ -945,6 +1050,95 @@ export default function Invoices() {
                     <Ban size={16} /> Cancel Order
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Payment Modal */}
+        {paymentTarget && (
+          <div className="modal-overlay" onClick={() => setPaymentTarget(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+              <div className="modal-header">
+                <h3>Add Payment</h3>
+                <button className="btn-icon" onClick={() => setPaymentTarget(null)}><X size={18} /></button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 12, fontSize: 14 }}>
+                  Balance due: <strong>{formatCurrency(paymentTarget.total - (paymentTarget.amount_paid || 0))}</strong>
+                </div>
+                <label>Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setPaymentTarget(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={submitPayment}>Record Payment</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Return Items Modal */}
+        {returnModal && (
+          <div className="modal-overlay" onClick={() => setReturnModal(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+              <div className="modal-header">
+                <h3>Return Items</h3>
+                <button className="btn-icon" onClick={() => setReturnModal(null)}><X size={18} /></button>
+              </div>
+              <div className="modal-body">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Sold</th>
+                      <th>Return Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnModal.items?.filter((i) => i.product_id).map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.product_name || item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.quantity}
+                            step="0.01"
+                            className="form-control"
+                            style={{ width: 90 }}
+                            value={returnQtys[item.product_id] || ""}
+                            onChange={(e) =>
+                              setReturnQtys({ ...returnQtys, [item.product_id]: e.target.value })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 14 }}>
+                  <label>Reason</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setReturnModal(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={submitReturn}>Record Return</button>
               </div>
             </div>
           </div>

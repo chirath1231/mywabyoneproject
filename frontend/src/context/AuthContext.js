@@ -91,8 +91,34 @@ export function AuthProvider({ children }) {
     setOrganization(null);
   };
 
+  // Merge rather than replace — /settings/organization returns the raw DB
+  // row and doesn't include computed fields like enabled_modules (only
+  // /auth/me does), so a full replace would wipe those out of context.
   const updateOrganization = (org) => {
-    setOrganization(org);
+    setOrganization((prev) => ({ ...prev, ...org }));
+  };
+
+  // Owner holds every role/permission implicitly, mirroring the backend's
+  // requireRole()/requirePermission() (backend/middleware/auth.js).
+  const hasRole = (roles) => {
+    if (!user?.role) return false;
+    const allowed = Array.isArray(roles) ? roles : [roles];
+    return allowed.includes(user.role);
+  };
+
+  const hasPermission = (key) => {
+    if (!user) return false;
+    if (user.role === "owner") return true;
+    return (user.permissions || []).includes(key);
+  };
+
+  // Fails open (true) until organization.enabled_modules has actually
+  // loaded, so the sidebar doesn't flash a shorter nav list before /auth/me
+  // resolves — ProtectedRoute already blocks rendering during that window,
+  // this is just a defensive default for anything that renders sooner.
+  const hasModule = (moduleKey) => {
+    if (!organization?.enabled_modules) return true;
+    return organization.enabled_modules.includes(moduleKey);
   };
 
   return (
@@ -107,6 +133,9 @@ export function AuthProvider({ children }) {
         logout,
         updateOrganization,
         loadUser,
+        hasRole,
+        hasPermission,
+        hasModule,
       }}
     >
       {children}

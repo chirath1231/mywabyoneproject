@@ -4,7 +4,7 @@ import api from "../api/api";
 import {
   Plus, Search, Edit2, Trash2, Package, X,
   ShieldCheck, Hash, ChevronLeft, ChevronRight,
-  Upload, Image as ImageIcon, Link2, Loader2,
+  Upload, Image as ImageIcon, Link2, Loader2, History,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useWorkspace } from "../context/WorkspaceContext";
@@ -170,6 +170,63 @@ export default function Products() {
   const [form,      setForm]      = useState(EMPTY_FORM);
   const [page,      setPage]      = useState(1);
   const [pageSize,  setPageSize]  = useState(10);
+  const [historyProduct, setHistoryProduct] = useState(null);
+  const [historyEntries, setHistoryEntries] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ id: "", name: "" });
+
+  const loadCategories = async () => {
+    try {
+      const res = await api.get("/settings/categories", { params: { type: "product" } });
+      setCategories(res.data);
+    } catch {
+      toast.error("Failed to load categories");
+    }
+  };
+
+  const submitCategory = async (e) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) return;
+    try {
+      if (categoryForm.id) {
+        await api.put(`/settings/categories/${categoryForm.id}`, { name: categoryForm.name });
+        toast.success("Category updated");
+      } else {
+        await api.post("/settings/categories", { name: categoryForm.name, type: "product" });
+        toast.success("Category added");
+      }
+      setCategoryForm({ id: "", name: "" });
+      loadCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to save category");
+    }
+  };
+
+  const deleteCategory = async (id) => {
+    if (!window.confirm("Delete this category?")) return;
+    try {
+      await api.delete(`/settings/categories/${id}`);
+      toast.success("Category deleted");
+      loadCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to delete category");
+    }
+  };
+
+  const openHistory = async (p) => {
+    setHistoryProduct(p);
+    setHistoryLoading(true);
+    try {
+      const res = await api.get(`/products/${p.id}/stock-history`);
+      setHistoryEntries(res.data.entries);
+    } catch {
+      toast.error("Failed to load stock history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   /* ── data ── */
   const loadProducts = async (q = search) => {
@@ -183,7 +240,7 @@ export default function Products() {
     }
   };
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => { loadProducts(); loadCategories(); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => { loadProducts(search); setPage(1); }, 300);
@@ -589,6 +646,7 @@ export default function Products() {
                         {/* Actions */}
                         <td>
                           <div style={{ display: "flex", gap: 6 }}>
+                            <button className="pr-action-btn" title="Stock history" onClick={() => openHistory(p)}><History size={14} /></button>
                             <button className="pr-action-btn" onClick={() => openEdit(p)}><Edit2 size={14} /></button>
                             <button className="pr-action-btn danger" onClick={() => handleDelete(p.id)}><Trash2 size={14} /></button>
                           </div>
@@ -706,6 +764,19 @@ export default function Products() {
                   </div>
                 </div>
 
+                <div className="pr-form-group">
+                  <label className="pr-label">Category</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select className="pr-input" value={form.category_id} onChange={(e) => set("category_id", e.target.value)}>
+                      <option value="">No category</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <button type="button" className="pr-btn" onClick={() => setShowCategoryModal(true)}>Manage</button>
+                  </div>
+                </div>
+
                 <div className="pr-toggle-row">
                   <div>
                     <div className="pr-toggle-label">Active</div>
@@ -812,6 +883,98 @@ export default function Products() {
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {historyProduct && (
+          <div className="pr-overlay" onClick={() => setHistoryProduct(null)}>
+            <div className="pr-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="pr-modal-head">
+                <div className="pr-modal-title">Stock History — {historyProduct.name}</div>
+                <button className="pr-modal-close" onClick={() => setHistoryProduct(null)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="pr-modal-body">
+                {historyLoading ? (
+                  <div style={{ textAlign: "center", padding: 24, color: "var(--text-muted)" }}>Loading…</div>
+                ) : historyEntries.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 24, color: "var(--text-muted)" }}>No stock movements recorded yet.</div>
+                ) : (
+                  <table className="pr-table" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Reason</th>
+                        <th>Change</th>
+                        <th>Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyEntries.map((e) => (
+                        <tr key={e.id}>
+                          <td>{new Date(e.created_at).toLocaleString()}</td>
+                          <td style={{ textTransform: "capitalize" }}>{e.reason.replace(/_/g, " ")}</td>
+                          <td style={{ color: parseFloat(e.change_qty) >= 0 ? "var(--success, #22c55e)" : "var(--danger, #ef4444)" }}>
+                            {parseFloat(e.change_qty) >= 0 ? "+" : ""}{e.change_qty}
+                          </td>
+                          <td>{e.quantity_after}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="pr-modal-foot">
+                <button className="pr-btn" onClick={() => setHistoryProduct(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCategoryModal && (
+          <div className="pr-overlay" onClick={() => setShowCategoryModal(false)}>
+            <div className="pr-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+              <div className="pr-modal-head">
+                <div className="pr-modal-title">Manage Categories</div>
+                <button className="pr-modal-close" onClick={() => setShowCategoryModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="pr-modal-body">
+                <form onSubmit={submitCategory} style={{ display: "flex", gap: 8 }}>
+                  <input
+                    className="pr-input"
+                    placeholder={categoryForm.id ? "Rename category" : "New category name"}
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                  <button type="submit" className="pr-btn pr-btn-primary">{categoryForm.id ? "Save" : "Add"}</button>
+                  {categoryForm.id && (
+                    <button type="button" className="pr-btn" onClick={() => setCategoryForm({ id: "", name: "" })}>Cancel</button>
+                  )}
+                </form>
+
+                {categories.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 24, color: "var(--text-muted)" }}>No categories yet.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {categories.map((c) => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8 }}>
+                        <span>{c.name}</span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="pr-action-btn" onClick={() => setCategoryForm({ id: c.id, name: c.name })}><Edit2 size={14} /></button>
+                          <button className="pr-action-btn danger" onClick={() => deleteCategory(c.id)}><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="pr-modal-foot">
+                <button className="pr-btn" onClick={() => setShowCategoryModal(false)}>Close</button>
+              </div>
             </div>
           </div>
         )}
