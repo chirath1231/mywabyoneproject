@@ -2,7 +2,7 @@ const express = require("express");
 const { body, validationResult } = require("express-validator");
 const { query: db } = require("../config/db");
 const { auth } = require("../middleware/auth");
-const { deleteOciImage } = require("./ociStorage"); // adjust path to match your structure
+const { deleteImage } = require("./fileStorage");
 
 const router = express.Router();
 
@@ -150,8 +150,8 @@ router.post(
 
 /* ─────────────────────────────────────────────────────────────
    PUT /products/:id
-   If image_url changed and the old one was an OCI proxy URL,
-   delete the old image from OCI.
+   If image_url changed and the old one was an image proxy URL,
+   delete the old image from storage.
 ───────────────────────────────────────────────────────────── */
 router.put("/:id", auth, async (req, res) => {
   try {
@@ -225,7 +225,7 @@ router.put("/:id", auth, async (req, res) => {
 
     if (result.rows.length === 0) return res.status(404).json({ error: "Product not found" });
 
-    // ── Clean up old OCI image if it was replaced with a different one ──
+    // ── Clean up old stored image if it was replaced with a different one ──
     const newImageUrl = result.rows[0].image_url;
     if (
       oldImageUrl &&
@@ -233,7 +233,7 @@ router.put("/:id", auth, async (req, res) => {
       oldImageUrl.includes("image-proxy")
     ) {
       // Fire-and-forget — don't delay the response
-      deleteOciImage(oldImageUrl).catch(() => {});
+      deleteImage(oldImageUrl).catch(() => {});
     }
 
     res.json(result.rows[0]);
@@ -245,11 +245,11 @@ router.put("/:id", auth, async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────
    DELETE /products/:id
-   Also deletes the associated OCI image if one exists.
+   Also deletes the associated stored image if one exists.
 ───────────────────────────────────────────────────────────── */
 router.delete("/:id", auth, async (req, res) => {
   try {
-    // Fetch image_url before deleting so we can clean up OCI
+    // Fetch image_url before deleting so we can clean up storage
     const existing = await db(
       "SELECT image_url FROM wabyone_products WHERE id = $1 AND org_id = $2",
       [req.params.id, req.user.orgId],
@@ -267,9 +267,9 @@ router.delete("/:id", auth, async (req, res) => {
       [req.params.id, req.user.orgId],
     );
 
-    // ── Delete from OCI (fire-and-forget, never blocks the response) ──
+    // ── Delete from storage (fire-and-forget, never blocks the response) ──
     if (imageUrl && imageUrl.includes("image-proxy")) {
-      deleteOciImage(imageUrl).catch(() => {});
+      deleteImage(imageUrl).catch(() => {});
     }
 
     res.json({ message: "Product deleted" });

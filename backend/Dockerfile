@@ -10,11 +10,14 @@ RUN npm run build && npm prune --omit=dev
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
-    PORT=5000
+    PORT=5000 \
+    UPLOAD_DIR=/app/uploads
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/db ./db
 COPY package.json ./
+RUN mkdir -p /app/uploads/products && chown -R node:node /app/uploads
+VOLUME /app/uploads
 USER node
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
