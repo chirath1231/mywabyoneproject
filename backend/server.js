@@ -33,7 +33,9 @@ const app = express();
 // ─────────────────────────────────────────────
 // TRUST PROXY
 // ─────────────────────────────────────────────
-app.set("trust proxy", 1);
+// Number of reverse proxies in front of the app.
+// Railway = 1. Dokploy = 2 (Traefik -> frontend nginx -> backend).
+app.set("trust proxy", parseInt(process.env.TRUST_PROXY || "1", 10));
 
 // ─────────────────────────────────────────────
 // HELMET
@@ -202,6 +204,15 @@ app.listen(PORT, '0.0.0.0', async () => {
     let migrationsDir = path.join(__dirname, "db", "migrations");
     if (!fs.existsSync(migrationsDir)) {
       migrationsDir = path.join(__dirname, "..", "db", "migrations");
+    }
+
+    // Base schema first (idempotent: CREATE ... IF NOT EXISTS) so a brand-new
+    // empty database (e.g. fresh Postgres on Dokploy) boots without a manual
+    // `npm run migrate`.
+    const schemaPath = path.join(migrationsDir, "..", "schema.sql");
+    if (fs.existsSync(schemaPath)) {
+      await pool.query(fs.readFileSync(schemaPath, "utf-8"));
+      console.log("    ✔ Base schema applied: schema.sql");
     }
 
     if (fs.existsSync(migrationsDir)) {

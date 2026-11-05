@@ -1,0 +1,64 @@
+# WabyOne ERP — Dokploy (Docker Compose service)
+# In Dokploy: Domains tab -> service "frontend", port 80, HTTPS on.
+# Fill variables in Dokploy's "Environment" tab (see .env.example).
+
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    expose:
+      - "5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      TRUST_PROXY: 2
+      # --- Database ---
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSL: ${DB_SSL:-false}
+      # --- App URLs ---
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_BASE_URL: ${API_BASE_URL:-}
+      PUBLIC_WEBHOOK_BASE: ${PUBLIC_WEBHOOK_BASE:-}
+      # --- Auth ---
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # --- Mail ---
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_LOG_OTP: ${SMTP_LOG_OTP:-false}
+      # --- AI / WhatsApp ---
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      AI_REPLY_DELAY_MIN_MS: ${AI_REPLY_DELAY_MIN_MS:-}
+      AI_REPLY_DELAY_MAX_MS: ${AI_REPLY_DELAY_MAX_MS:-}
+      GREEN_API_PARTNER_URL: ${GREEN_API_PARTNER_URL:-}
+      GREEN_API_PARTNER_TOKEN: ${GREEN_API_PARTNER_TOKEN:-}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      # --- Oracle Object Storage ---
+      OCI_TENANCY_ID: ${OCI_TENANCY_ID:-}
+      OCI_USER_ID: ${OCI_USER_ID:-}
+      OCI_FINGERPRINT: ${OCI_FINGERPRINT:-}
+      OCI_PRIVATE_KEY: ${OCI_PRIVATE_KEY:-}
+      OCI_REGION: ${OCI_REGION:-}
+      OCI_NAMESPACE: ${OCI_NAMESPACE:-}
+      OCI_BUCKET_NAME: ${OCI_BUCKET_NAME:-}
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: /api
+        REACT_APP_PAYHERE_MERCHANT_ID: ${REACT_APP_PAYHERE_MERCHANT_ID:-}
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - backend
