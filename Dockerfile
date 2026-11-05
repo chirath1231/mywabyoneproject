@@ -4,7 +4,8 @@
 #          Domain -> port 5000.
 
 # ---------- 1. build React frontend ----------
-FROM node:20-alpine AS frontend
+# Node 24 / npm 11: the lockfile is only valid for npm 11 (npm 10 fails on yaml)
+FROM node:24-alpine AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
