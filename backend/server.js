@@ -33,8 +33,7 @@ const app = express();
 // ─────────────────────────────────────────────
 // TRUST PROXY
 // ─────────────────────────────────────────────
-// Number of reverse proxies in front of the app.
-// Railway = 1. Dokploy = 2 (Traefik -> frontend nginx -> backend).
+// Number of reverse proxies in front of the app (Railway / Dokploy Traefik = 1).
 app.set("trust proxy", parseInt(process.env.TRUST_PROXY || "1", 10));
 
 // ─────────────────────────────────────────────
@@ -44,6 +43,9 @@ app.use(
   helmet({
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    // The React app is served from this server too; helmet's default CSP
+    // would block Google Sign-In, PayHere and CRA's inline runtime chunk.
+    contentSecurityPolicy: false,
   })
 );
 
@@ -91,8 +93,22 @@ const corsOptions = {
   ],
 };
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Requests from the same domain this server is reached on (frontend served by
+// this app on Dokploy) are always allowed — no need to list the domain.
+const corsDelegate = (req, callback) => {
+  const origin = req.header("Origin");
+  try {
+    if (origin && new URL(origin).host === req.get("host")) {
+      return callback(null, { ...corsOptions, origin: true });
+    }
+  } catch {
+    // malformed Origin — fall through to normal checks
+  }
+  callback(null, corsOptions);
+};
+
+app.use(cors(corsDelegate));
+app.options("*", cors(corsDelegate));
 // ─────────────────────────────────────────────
 // RATE LIMITING
 // ─────────────────────────────────────────────
@@ -164,6 +180,27 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// ─────────────────────────────────────────────
+// FRONTEND (React build) — single-container deploy
+// ─────────────────────────────────────────────
+// Dockerfile copies the React build to /app/public. Locally / on Railway the
+// folder doesn't exist and this block is skipped (API-only, as before).
+const fs = require("fs");
+const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, "..", "public");
+if (fs.existsSync(path.join(STATIC_DIR, "index.html"))) {
+  app.use(
+    "/static",
+    express.static(path.join(STATIC_DIR, "static"), { immutable: true, maxAge: "1y" })
+  );
+  app.use(express.static(STATIC_DIR, { index: false, maxAge: 0 }));
+  // React Router: any non-API GET returns index.html
+  app.get(/^\/(?!api(\/|$)).*/, (req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(path.join(STATIC_DIR, "index.html"));
+  });
+  console.log(`    Serving frontend from ${STATIC_DIR}`);
+}
 
 // ─────────────────────────────────────────────
 // 404 HANDLER

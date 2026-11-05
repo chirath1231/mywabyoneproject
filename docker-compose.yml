@@ -1,18 +1,21 @@
-# WabyOne ERP — Dokploy (Docker Compose service)
-# In Dokploy: Domains tab -> service "frontend", port 80, HTTPS on.
+# WabyOne ERP - optional Compose variant (Dokploy "Compose" service).
+# Simpler: use a Dokploy "Application" with the root Dockerfile instead.
+# Domains tab -> service "wabyone", port 5000, HTTPS on.
 # Fill variables in Dokploy's "Environment" tab (see .env.example).
 
 services:
-  backend:
+  wabyone:
     build:
-      context: ./backend
+      context: .
+      args:
+        REACT_APP_PAYHERE_MERCHANT_ID: ${REACT_APP_PAYHERE_MERCHANT_ID:-}
     restart: unless-stopped
     expose:
       - "5000"
     environment:
       NODE_ENV: production
       PORT: 5000
-      TRUST_PROXY: 2
+      TRUST_PROXY: 1
       # --- Database ---
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT:-5432}
@@ -22,7 +25,6 @@ services:
       DB_SSL: ${DB_SSL:-false}
       # --- App URLs ---
       FRONTEND_URL: ${FRONTEND_URL}
-      API_BASE_URL: ${API_BASE_URL:-}
       PUBLIC_WEBHOOK_BASE: ${PUBLIC_WEBHOOK_BASE:-}
       # --- Auth ---
       JWT_SECRET: ${JWT_SECRET}
@@ -46,18 +48,6 @@ services:
       UPLOAD_DIR: /app/uploads
     volumes:
       - wabyone_uploads:/app/uploads
-
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        REACT_APP_API_URL: /api
-        REACT_APP_PAYHERE_MERCHANT_ID: ${REACT_APP_PAYHERE_MERCHANT_ID:-}
-    restart: unless-stopped
-    expose:
-      - "80"
-    depends_on:
-      - backend
 
 volumes:
   wabyone_uploads:
